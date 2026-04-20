@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
     "com.unity.2d.animation": "13.0.4",
     "com.unity.2d.aseprite": "3.0.1",
     "com.unity.2d.psdimporter": "12.0.1",
@@ -8,7 +9,6 @@
     "com.unity.2d.tilemap": "1.0.0",
     "com.unity.2d.tilemap.extras": "6.0.1",
     "com.unity.2d.tooling": "1.0.2",
-    "com.unity.ads": "4.16.4",
     "com.unity.ai.navigation": "2.0.10",
     "com.unity.analytics": "3.8.2",
     "com.unity.collab-proxy": "2.11.3",
@@ -56,21 +56,6 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0",
-    "com.ivanmurzak.unity.mcp": "0.63.4"
-  },
-  "scopedRegistries": [
-    {
-      "name": "package.openupm.com",
-      "url": "https://package.openupm.com",
-      "scopes": [
-        "com.ivanmurzak",
-        "extensions.unity",
-        "org.nuget.com.ivanmurzak",
-        "org.nuget.microsoft",
-        "org.nuget.system",
-        "org.nuget.r3"
-      ]
-    }
-  ]
+    "com.unity.modules.xr": "1.0.0"
+  }
 }

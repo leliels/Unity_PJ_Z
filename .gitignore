@@ -98,5 +98,12 @@ InitTestScene*.unity*
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
+# Unity MCP plugin NuGet dependencies (auto-restored by Package Manager)
+/[Aa]ssets/Plugins/NuGet/
+/[Aa]ssets/Plugins/NuGet.meta
+
+# Obsidian config
+设计文档/.obsidian/
+
 # CodeBuddy IDE data
 .codebuddy/
