@@ -26,7 +26,7 @@ namespace BlockPuzzle.Block
 
         // 拖拽时方块锚点相对鼠标的固定偏移：向上抬高一些，避免手指/光标遮挡
         // 并向左下偏移半格，让"鼠标尖端"对齐方块左下角格子的中心
-        private static readonly Vector3 DragAnchorOffset = new Vector3(0f, 1.5f, 0f);
+        private static readonly Vector3 DragAnchorOffset = new Vector3(0f, 2.0f, 0f);
 
         // 当前预览位置
         private Vector2Int _lastPreviewGrid = new Vector2Int(-999, -999);

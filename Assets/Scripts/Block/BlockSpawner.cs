@@ -160,7 +160,7 @@ namespace BlockPuzzle.Block
                 cellGo.transform.localScale = Vector3.one * Constants.CellSize;
 
                 var sr = cellGo.AddComponent<SpriteRenderer>();
-                sr.sprite = SpriteUtils.WhiteSquare;
+                sr.sprite = SpriteUtils.BlockSprite;
                 sr.color = color;
                 sr.sortingOrder = 10;
             }

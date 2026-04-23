@@ -16,6 +16,7 @@ namespace BlockPuzzle.Core
         private void Awake()
         {
             SetupCamera();
+            CreateBackgroundUI();
             CreateManagers();
             CreateUI();
         }
@@ -30,7 +31,44 @@ namespace BlockPuzzle.Core
             cam.orthographic = true;
             cam.orthographicSize = 11f; // 竖屏：上下各11个世界单位
             cam.transform.position = new Vector3(0f, 0f, -10f);
-            cam.backgroundColor = new Color(0.08f, 0.08f, 0.12f, 1f); // 深色背景
+            cam.backgroundColor = new Color(0.15f, 0.12f, 0.10f, 1f); // 棕色 fallback（匹配背景图色调）
+        }
+
+        // ==================== 创建背景（UI Canvas 方式） ====================
+
+        private void CreateBackgroundUI()
+        {
+            var bgSprite = Utils.SpriteUtils.BackgroundSprite;
+            if (bgSprite == null) return;
+
+            // 创建独立的背景 Canvas（ScreenSpaceCamera 模式，渲染在世界空间之后）
+            var bgCanvasGo = new GameObject("BackgroundCanvas");
+            var bgCanvas = bgCanvasGo.AddComponent<Canvas>();
+            bgCanvas.renderMode = RenderMode.ScreenSpaceCamera;
+            bgCanvas.worldCamera = Camera.main;
+            bgCanvas.planeDistance = 50f; // 足够远，在棋盘/方块之后
+            bgCanvas.sortingOrder = -10; // 最底层
+
+            var bgScaler = bgCanvasGo.AddComponent<CanvasScaler>();
+            bgScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            bgScaler.referenceResolution = new Vector2(1080, 1920);
+            bgScaler.matchWidthOrHeight = 1f; // 以高度为基准（竖屏）
+
+            // 创建全屏 Image
+            var bgImageGo = new GameObject("BackgroundImage");
+            bgImageGo.transform.SetParent(bgCanvasGo.transform, false);
+
+            var bgRect = bgImageGo.AddComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+
+            var bgImage = bgImageGo.AddComponent<Image>();
+            bgImage.sprite = bgSprite;
+            bgImage.type = Image.Type.Simple;
+            bgImage.preserveAspect = false; // 拉伸填满
+            bgImage.raycastTarget = false;  // 不阻挡点击
         }
 
         // ==================== 创建管理器 ====================
@@ -94,7 +132,7 @@ namespace BlockPuzzle.Core
             // --- 分数文本 ---
             var scoreGo = CreateUIText(canvasGo.transform, "ScoreText", "Score: 0",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -40), new Vector2(400, 80), 48, TextAnchor.MiddleCenter, Color.white);
+                new Vector2(0, -80), new Vector2(400, 80), 52, TextAnchor.MiddleCenter, Color.white);
 
             // --- 游戏结束面板 ---
             var gameOverPanel = CreateGameOverPanel(canvasGo.transform);
@@ -107,6 +145,22 @@ namespace BlockPuzzle.Core
             SetPrivateField(gameUI, "_gameOverPanel", gameOverPanel);
             SetPrivateField(gameUI, "_finalScoreText", gameOverPanel.transform.Find("FinalScoreText").GetComponent<Text>());
             SetPrivateField(gameUI, "_restartButton", gameOverPanel.transform.Find("RestartButton").GetComponent<Button>());
+
+            // --- 得分飘字管理器 ---
+            var floatingMgr = canvasGo.AddComponent<FloatingScoreManager>();
+            floatingMgr.Init(canvas);
+
+            // 监听消除计分事件，驱动飘字
+            if (Score.ScoreManager.Instance != null)
+            {
+                Score.ScoreManager.Instance.OnLineClearScoreDetail += (lineCount, baseScore, comboBonus, comboCount) =>
+                {
+                    floatingMgr.EnqueueClearScore(baseScore, lineCount);
+                    if (comboBonus > 0)
+                        floatingMgr.EnqueueComboBonus(comboCount, Utils.Constants.GetComboMultiplier(comboCount), comboBonus);
+                    floatingMgr.PlayAll();
+                };
+            }
         }
 
         private GameObject CreateGameOverPanel(Transform parent)

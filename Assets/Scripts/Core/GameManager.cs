@@ -17,6 +17,9 @@ namespace BlockPuzzle.Core
         private GameState _currentState;
         public GameState CurrentState => _currentState;
 
+        // 标记本次放置是否触发了消除（用于 Combo 判定）
+        private bool _clearedThisTurn;
+
         private void Start()
         {
             StartGame();
@@ -36,6 +39,8 @@ namespace BlockPuzzle.Core
             // 初始化候选方块
             BlockSpawner.Instance.ClearAll();
             BlockSpawner.Instance.Init();
+
+            _clearedThisTurn = false;
 
             // 注册事件
             RegisterEvents();
@@ -80,12 +85,34 @@ namespace BlockPuzzle.Core
 
         private void HandleBlockPlaced(int cellCount)
         {
+            // 重置标记：等待消除事件
+            _clearedThisTurn = false;
+
+            // 放置方块加分（每格 1 分）
             ScoreManager.Instance.AddPlacementScore(cellCount);
         }
 
         private void HandleLinesCleared(int lineCount)
         {
-            ScoreManager.Instance.AddLineClearScore(lineCount);
+            if (lineCount > 0)
+            {
+                _clearedThisTurn = true;
+                // 消除加分（含 Combo 加成，由 ScoreManager 内部处理）
+                ScoreManager.Instance.AddLineClearScore(lineCount);
+            }
+        }
+
+        /// <summary>
+        /// 在方块放置并完成消除检测后调用，判断 Combo 中断
+        /// 由 BoardManager.PlaceBlock 流程末尾触发
+        /// </summary>
+        public void OnTurnComplete()
+        {
+            if (!_clearedThisTurn)
+            {
+                // 本次放置没有消除 → Combo 中断
+                ScoreManager.Instance.ResetCombo();
+            }
         }
 
         private void HandleGameOver()

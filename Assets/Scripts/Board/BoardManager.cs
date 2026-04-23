@@ -72,7 +72,7 @@ namespace BlockPuzzle.Board
             _boardContainer = new GameObject("BoardContainer").transform;
             _boardContainer.SetParent(transform);
 
-            Sprite cellSprite = SpriteUtils.WhiteSquare;
+            Sprite cellSprite = SpriteUtils.CellSprite;
 
             for (int col = 0; col < Constants.BoardCols; col++)
             {
@@ -188,6 +188,10 @@ namespace BlockPuzzle.Board
 
                 OnLinesCleared?.Invoke(totalLines);
             }
+
+            // 通知 GameManager 本回合结束（用于 Combo 中断判定）
+            if (Core.GameManager.Instance != null)
+                Core.GameManager.Instance.OnTurnComplete();
         }
 
         // ==================== 游戏结束判定 ====================
@@ -248,7 +252,7 @@ namespace BlockPuzzle.Board
                 go.transform.localScale = Vector3.one * Constants.CellSize;
 
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = SpriteUtils.WhiteSquare;
+                    sr.sprite = SpriteUtils.CellSprite;
                 sr.color = previewColor;
                 sr.sortingOrder = 5;
 
