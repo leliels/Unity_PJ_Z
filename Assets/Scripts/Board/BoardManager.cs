@@ -12,6 +12,14 @@ namespace BlockPuzzle.Board
     /// </summary>
     public class BoardManager : Singleton<BoardManager>
     {
+        // --- Prefab 引用（Inspector 可配置） ---
+        [Header("Prefab 配置")]
+        [Tooltip("棋盘格子 Prefab（需含 SpriteRenderer）。为空时使用代码创建 fallback。")]
+        [SerializeField] private GameObject _cellPrefab;
+
+        [Tooltip("预览格子 Prefab（需含 SpriteRenderer）。为空时使用代码创建 fallback。")]
+        [SerializeField] private GameObject _previewPrefab;
+
         // --- 事件 ---
         /// <summary>放置方块后触发（参数：放置的格子数）</summary>
         public event Action<int> OnBlockPlaced;
@@ -25,6 +33,11 @@ namespace BlockPuzzle.Board
         private SpriteRenderer[,] _cellRenderers;       // [col, row] 格子渲染器
         private Color[,] _cellColors;                   // [col, row] 格子颜色记录
         private Transform _boardContainer;
+
+        /// <summary>外部设置 Cell Prefab（供 SceneBootstrap 代码注入）</summary>
+        public void SetCellPrefab(GameObject prefab) { if (_cellPrefab == null) _cellPrefab = prefab; }
+        /// <summary>外部设置 Preview Prefab</summary>
+        public void SetPreviewPrefab(GameObject prefab) { if (_previewPrefab == null) _previewPrefab = prefab; }
 
         // --- 棋盘的世界坐标起点（左下角） ---
         private Vector3 _boardOrigin;
@@ -78,13 +91,30 @@ namespace BlockPuzzle.Board
             {
                 for (int row = 0; row < Constants.BoardRows; row++)
                 {
-                    var cellGo = new GameObject($"Cell_{col}_{row}");
-                    cellGo.transform.SetParent(_boardContainer);
-                    cellGo.transform.position = GridToWorld(col, row);
-                    cellGo.transform.localScale = Vector3.one * Constants.CellSize;
+                    GameObject cellGo;
+                    SpriteRenderer sr;
 
-                    var sr = cellGo.AddComponent<SpriteRenderer>();
-                    sr.sprite = cellSprite;
+                    if (_cellPrefab != null)
+                    {
+                        // Prefab 方式：实例化预制体
+                        cellGo = Instantiate(_cellPrefab, _boardContainer);
+                        cellGo.name = $"Cell_{col}_{row}";
+                        cellGo.transform.position = GridToWorld(col, row);
+                        cellGo.transform.localScale = Vector3.one * Constants.CellSize;
+                        sr = cellGo.GetComponent<SpriteRenderer>();
+                        if (sr == null) sr = cellGo.AddComponent<SpriteRenderer>();
+                    }
+                    else
+                    {
+                        // Fallback：代码创建（兼容无 Prefab 情况）
+                        cellGo = new GameObject($"Cell_{col}_{row}");
+                        cellGo.transform.SetParent(_boardContainer);
+                        cellGo.transform.position = GridToWorld(col, row);
+                        cellGo.transform.localScale = Vector3.one * Constants.CellSize;
+                        sr = cellGo.AddComponent<SpriteRenderer>();
+                        sr.sprite = cellSprite;
+                    }
+
                     sr.color = Constants.CellEmptyColor;
                     sr.sortingOrder = 0;
 
@@ -247,12 +277,29 @@ namespace BlockPuzzle.Board
 
                 if (!IsInsideBoard(c, r)) continue;
 
-                var go = new GameObject("Preview");
-                go.transform.position = GridToWorld(c, r);
-                go.transform.localScale = Vector3.one * Constants.CellSize;
+                GameObject go;
+                SpriteRenderer sr;
 
-                var sr = go.AddComponent<SpriteRenderer>();
+                if (_previewPrefab != null)
+                {
+                    // Prefab 方式
+                    go = Instantiate(_previewPrefab);
+                    go.name = "Preview";
+                    go.transform.position = GridToWorld(c, r);
+                    go.transform.localScale = Vector3.one * Constants.CellSize;
+                    sr = go.GetComponent<SpriteRenderer>();
+                    if (sr == null) sr = go.AddComponent<SpriteRenderer>();
+                }
+                else
+                {
+                    // Fallback：代码创建
+                    go = new GameObject("Preview");
+                    go.transform.position = GridToWorld(c, r);
+                    go.transform.localScale = Vector3.one * Constants.CellSize;
+                    sr = go.AddComponent<SpriteRenderer>();
                     sr.sprite = SpriteUtils.CellSprite;
+                }
+
                 sr.color = previewColor;
                 sr.sortingOrder = 5;
 
@@ -270,6 +317,34 @@ namespace BlockPuzzle.Board
                 if (sr != null) Destroy(sr.gameObject);
             }
             _previewRenderers.Clear();
+        }
+
+        // ==================== 运行时重新布局 ====================
+
+        /// <summary>
+        /// 运行时就地重新布局：根据当前 Constants 中的值重新计算所有格子位置和大小。
+        /// 不销毁/重建对象，不影响游戏状态（占用、颜色等全部保留）。
+        /// </summary>
+        public void RelayoutBoard()
+        {
+            if (_cellRenderers == null) return;
+
+            // 重新计算棋盘左下角世界坐标
+            float boardWidth = Constants.BoardCols * CellStep - Constants.CellSpacing;
+            float boardHeight = Constants.BoardRows * CellStep - Constants.CellSpacing;
+            _boardOrigin = Constants.BoardCenter - new Vector3(boardWidth / 2f, boardHeight / 2f, 0f);
+
+            for (int col = 0; col < Constants.BoardCols; col++)
+            {
+                for (int row = 0; row < Constants.BoardRows; row++)
+                {
+                    var sr = _cellRenderers[col, row];
+                    if (sr == null) continue;
+
+                    sr.transform.position = GridToWorld(col, row);
+                    sr.transform.localScale = Vector3.one * Constants.CellSize;
+                }
+            }
         }
     }
 }

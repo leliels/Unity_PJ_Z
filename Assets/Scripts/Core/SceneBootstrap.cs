@@ -10,15 +10,88 @@ namespace BlockPuzzle.Core
     /// <summary>
     /// 场景启动器：自动创建并配置所有运行时所需的管理器和UI。
     /// 将此脚本挂载到场景中的任意空 GameObject 上即可。
+    /// 所有配置项都可在 Inspector 中调整，为空/默认值时走代码创建 fallback。
     /// </summary>
     public class SceneBootstrap : MonoBehaviour
     {
+        // ==================== Prefab 配置 ====================
+        [Header("游戏元素 Prefab（可选，为空时代码创建 fallback）")]
+        [Tooltip("棋盘格子 Prefab（需含 SpriteRenderer）")]
+        [SerializeField] private GameObject _cellPrefab;
+
+        [Tooltip("预览格子 Prefab（需含 SpriteRenderer）")]
+        [SerializeField] private GameObject _previewPrefab;
+
+        [Tooltip("方块单格 Prefab（需含 SpriteRenderer）")]
+        [SerializeField] private GameObject _blockCellPrefab;
+
+        // ==================== UI Prefab 配置 ====================
+        [Header("UI Prefab（可选，为空时代码创建 fallback）")]
+        [Tooltip("积分显示 Prefab（需含 Text 组件）。可在 Prefab 中调整字体、字号、颜色、位置。")]
+        [SerializeField] private GameObject _scoreTextPrefab;
+
+        [Tooltip("GameOver 面板 Prefab（需含子对象 FinalScoreText(Text) 和 RestartButton(Button)）")]
+        [SerializeField] private GameObject _gameOverPanelPrefab;
+
+        [Tooltip("飘字 Prefab（需含 Text + Outline 组件）。可在 Prefab 中调整字体、字号、描边样式。")]
+        [SerializeField] private GameObject _floatingScorePrefab;
+
+        // ==================== 布局配置（在 Inspector 中调整） ====================
+        [Header("棋盘布局")]
+        [Tooltip("棋盘中心的世界坐标")]
+        [SerializeField] private Vector3 _boardCenter = new Vector3(0f, 1.1f, 0f);
+
+        [Tooltip("每个格子的世界单位大小")]
+        [SerializeField] private float _cellSize = 1.18f;
+
+        [Tooltip("格子之间的间距")]
+        [SerializeField] private float _cellSpacing = 0.08f;
+
+        [Header("候选区布局")]
+        [Tooltip("候选区中心的世界坐标")]
+        [SerializeField] private Vector3 _candidateCenter = new Vector3(0f, -8.2f, 0f);
+
+        [Tooltip("候选方块之间的水平间距")]
+        [SerializeField] private float _candidateSpacing = 3.6f;
+
+        [Tooltip("候选方块的缩放比例（相对于棋盘格子大小）")]
+        [SerializeField] private float _candidateScale = 0.55f;
+
+        // ==================== 显示格式配置 ====================
+        [Header("分数显示格式")]
+        [Tooltip("游戏中分数格式。{0}=分数数字。例：\"Score: {0}\"、\"分数\\n{0}\"、\"{0}\"")]
+        [SerializeField] private string _scoreFormat = "Score: {0}";
+
+        [Tooltip("结算分数格式。{0}=分数数字。例：\"Final Score\\n{0}\"、\"最终得分\\n{0}\"")]
+        [SerializeField] private string _finalScoreFormat = "Final Score\n{0}";
+
+        // ==================== HUD 按钮配置 ====================
+        [Header("HUD 按钮 Prefab（可选）")]
+        [Tooltip("重新开始按钮 Prefab（需含 Image + Button 组件）。为空时不显示。")]
+        [SerializeField] private GameObject _restartButtonPrefab;
+
         private void Awake()
         {
+            // 用 Inspector 配置覆盖全局常量（必须在其他初始化之前）
+            ApplyLayoutConfig();
+
             SetupCamera();
             CreateBackgroundUI();
             CreateManagers();
             CreateUI();
+        }
+
+        /// <summary>
+        /// 将 Inspector 中的布局配置写入 Constants，供所有系统使用
+        /// </summary>
+        private void ApplyLayoutConfig()
+        {
+            Utils.Constants.BoardCenter = _boardCenter;
+            Utils.Constants.CellSize = _cellSize;
+            Utils.Constants.CellSpacing = _cellSpacing;
+            Utils.Constants.CandidateCenter = _candidateCenter;
+            Utils.Constants.CandidateSpacing = _candidateSpacing;
+            Utils.Constants.CandidateScale = _candidateScale;
         }
 
         // ==================== 配置相机 ====================
@@ -81,12 +154,23 @@ namespace BlockPuzzle.Core
                 var boardGo = new GameObject("[BoardManager]");
                 boardGo.AddComponent<BoardManager>();
             }
+            // 注入 Prefab 引用
+            if (BoardManager.Instance != null)
+            {
+                BoardManager.Instance.SetCellPrefab(_cellPrefab);
+                BoardManager.Instance.SetPreviewPrefab(_previewPrefab);
+            }
 
             // BlockSpawner
             if (FindFirstObjectByType<BlockSpawner>() == null)
             {
                 var spawnerGo = new GameObject("[BlockSpawner]");
                 spawnerGo.AddComponent<BlockSpawner>();
+            }
+            // 注入 Prefab 引用
+            if (BlockSpawner.Instance != null)
+            {
+                BlockSpawner.Instance.SetBlockCellPrefab(_blockCellPrefab);
             }
 
             // ScoreManager
@@ -130,25 +214,65 @@ namespace BlockPuzzle.Core
             }
 
             // --- 分数文本 ---
-            var scoreGo = CreateUIText(canvasGo.transform, "ScoreText", "Score: 0",
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -80), new Vector2(400, 80), 52, TextAnchor.MiddleCenter, Color.white);
+            GameObject scoreGo;
+            if (_scoreTextPrefab != null)
+            {
+                // Prefab 方式：实例化预制体（字体、字号、颜色、位置都由 Prefab 决定）
+                scoreGo = Instantiate(_scoreTextPrefab, canvasGo.transform, false);
+                scoreGo.name = "ScoreText";
+            }
+            else
+            {
+                // Fallback：代码创建
+                scoreGo = CreateUIText(canvasGo.transform, "ScoreText", "Score: 0",
+                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                    new Vector2(0, -80), new Vector2(400, 80), 52, TextAnchor.MiddleCenter, Color.white);
+            }
 
             // --- 游戏结束面板 ---
-            var gameOverPanel = CreateGameOverPanel(canvasGo.transform);
+            GameObject gameOverPanel;
+            if (_gameOverPanelPrefab != null)
+            {
+                // Prefab 方式
+                gameOverPanel = Instantiate(_gameOverPanelPrefab, canvasGo.transform, false);
+                gameOverPanel.name = "GameOverPanel";
+                gameOverPanel.SetActive(false);
+            }
+            else
+            {
+                // Fallback：代码创建
+                gameOverPanel = CreateGameOverPanel(canvasGo.transform);
+            }
 
             // --- 挂载 GameUI 脚本 ---
             var gameUI = canvasGo.AddComponent<GameUI>();
 
             // 通过反射设置私有字段（因为是 SerializeField）
             SetPrivateField(gameUI, "_scoreText", scoreGo.GetComponent<Text>());
+            SetPrivateField(gameUI, "_scoreFormat", _scoreFormat);
             SetPrivateField(gameUI, "_gameOverPanel", gameOverPanel);
-            SetPrivateField(gameUI, "_finalScoreText", gameOverPanel.transform.Find("FinalScoreText").GetComponent<Text>());
-            SetPrivateField(gameUI, "_restartButton", gameOverPanel.transform.Find("RestartButton").GetComponent<Button>());
+            SetPrivateField(gameUI, "_finalScoreText", gameOverPanel.transform.Find("FinalScoreText")?.GetComponent<Text>());
+            SetPrivateField(gameUI, "_restartButton", gameOverPanel.transform.Find("RestartButton")?.GetComponent<Button>());
+            SetPrivateField(gameUI, "_finalScoreFormat", _finalScoreFormat);
+
+            // --- HUD 重新开始按钮（左上角） ---
+            if (_restartButtonPrefab != null)
+            {
+                var hudRestartGo = Instantiate(_restartButtonPrefab, canvasGo.transform, false);
+                hudRestartGo.name = "HudRestartButton";
+                var hudBtn = hudRestartGo.GetComponent<Button>();
+                if (hudBtn == null) hudBtn = hudRestartGo.AddComponent<Button>();
+                hudBtn.onClick.AddListener(() =>
+                {
+                    if (GameManager.Instance != null)
+                        GameManager.Instance.RestartGame();
+                });
+            }
 
             // --- 得分飘字管理器 ---
             var floatingMgr = canvasGo.AddComponent<FloatingScoreManager>();
             floatingMgr.Init(canvas);
+            floatingMgr.SetFloatingScorePrefab(_floatingScorePrefab);
 
             // 监听消除计分事件，驱动飘字
             if (Score.ScoreManager.Instance != null)
@@ -253,5 +377,48 @@ namespace BlockPuzzle.Core
             if (field != null)
                 field.SetValue(obj, value);
         }
+
+        // ==================== 运行时参数热更新 ====================
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Inspector 中任何值被修改时自动调用。
+        /// 运行时：立即将新值写入 Constants 并通知各 Manager 重新布局。
+        /// 编辑器非运行时：仅更新 Constants（不触发布局，因为场景还没初始化）。
+        /// </summary>
+        private void OnValidate()
+        {
+            // 将 Inspector 值同步到 Constants
+            ApplyLayoutConfig();
+
+            // 仅在运行时执行实时布局刷新
+            if (!Application.isPlaying) return;
+
+            // 延迟一帧执行，避免 OnValidate 中直接操作 GameObject 的限制
+            UnityEditor.EditorApplication.delayCall += () =>
+            {
+                if (this == null) return; // 防止脚本已被销毁
+
+                // 刷新棋盘布局
+                if (BoardManager.Instance != null)
+                    BoardManager.Instance.RelayoutBoard();
+
+                // 刷新候选区布局
+                if (BlockSpawner.Instance != null)
+                    BlockSpawner.Instance.RelayoutCandidates();
+
+                // 刷新分数格式显示
+                var gameUI = FindFirstObjectByType<GameUI>();
+                if (gameUI != null)
+                {
+                    SetPrivateField(gameUI, "_scoreFormat", _scoreFormat);
+                    SetPrivateField(gameUI, "_finalScoreFormat", _finalScoreFormat);
+                    // 立即用新格式刷新当前分数显示
+                    if (ScoreManager.Instance != null)
+                        gameUI.RefreshDisplay(ScoreManager.Instance.CurrentScore);
+                }
+            };
+        }
+#endif
     }
 }

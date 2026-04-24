@@ -3,29 +3,32 @@ using UnityEngine;
 namespace BlockPuzzle.Utils
 {
     /// <summary>
-    /// 全局常量定义
+    /// 全局常量与可配置参数。
+    /// 布局类参数为 static（非 const），可由 SceneBootstrap 在 Awake 时从 Inspector 覆盖。
     /// </summary>
     public static class Constants
     {
-        // --- 棋盘 ---
+        // --- 棋盘（逻辑，不可改） ---
         public const int BoardRows = 8;
         public const int BoardCols = 8;
-        public const float CellSize = 1.18f;       // 每个格子的世界单位大小（匹配背景图棋盘框）
-        public const float CellSpacing = 0.08f;     // 格子间距
 
-        // --- 候选方块 ---
-        public const int CandidateCount = 3;        // 候选区方块数量
-        public const float CandidateScale = 0.55f;  // 候选方块缩放比例
-        public const float CandidateSpacing = 3.6f;  // 候选方块间距
+        // --- 棋盘视觉（可在 Inspector 调整） ---
+        public static float CellSize = 1.18f;          // 每个格子的世界单位大小
+        public static float CellSpacing = 0.08f;       // 格子间距
+
+        // --- 候选方块（可在 Inspector 调整） ---
+        public const int CandidateCount = 3;            // 候选区方块数量
+        public static float CandidateScale = 0.55f;     // 候选方块缩放比例
+        public static float CandidateSpacing = 3.6f;    // 候选方块间距
 
         // --- 计分规则（2026-04-23 新版） ---
-        public const int ScorePerCell = 1;           // 放置每格分数
-        public const int LineClearBase = 16;         // 消除基数 = 棋盘列数(8) × 2
-        public const float ComboMultiplierStep = 0.2f; // 每次 Combo 增加的系数
+        public const int ScorePerCell = 1;               // 放置每格分数
+        public const int LineClearBase = 16;              // 消除基数 = 棋盘列数(8) × 2
+        public const float ComboMultiplierStep = 0.2f;    // 每次 Combo 增加的系数
 
-        // --- 布局位置（匹配背景图效果图） ---
-        public static readonly Vector3 BoardCenter = new Vector3(0f, 1.1f, 0f);
-        public static readonly Vector3 CandidateCenter = new Vector3(0f, -8.2f, 0f);
+        // --- 布局位置（可在 Inspector 调整） ---
+        public static Vector3 BoardCenter = new Vector3(0f, 1.1f, 0f);
+        public static Vector3 CandidateCenter = new Vector3(0f, -8.2f, 0f);
 
         // --- 颜色 ---
         public static readonly Color PreviewValidColor = new Color(1f, 1f, 1f, 0.4f);

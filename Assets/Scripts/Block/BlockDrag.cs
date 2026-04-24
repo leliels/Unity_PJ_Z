@@ -39,6 +39,39 @@ namespace BlockPuzzle.Block
             _blockColor = Constants.BlockColors[colorIndex];
         }
 
+        /// <summary>
+        /// 计算从方块中心锚点到左下角格子中心的世界空间偏移。
+        /// 方块创建时锚点在包围盒中心，但 WorldToGrid 需要左下角格子的坐标。
+        /// </summary>
+        private Vector3 GetCenterToOriginOffset()
+        {
+            if (_blockData == null) return Vector3.zero;
+
+            int minX = int.MaxValue, minY = int.MaxValue;
+            int maxX = int.MinValue, maxY = int.MinValue;
+            foreach (var cell in _blockData.Cells)
+            {
+                if (cell.x < minX) minX = cell.x;
+                if (cell.y < minY) minY = cell.y;
+                if (cell.x > maxX) maxX = cell.x;
+                if (cell.y > maxY) maxY = cell.y;
+            }
+
+            float step = Constants.CellSize + Constants.CellSpacing;
+            float offsetX = -(maxX - minX) * step * 0.5f;
+            float offsetY = -(maxY - minY) * step * 0.5f;
+            return new Vector3(offsetX, offsetY, 0f);
+        }
+
+        /// <summary>
+        /// 运行时布局变化时更新原始位置和缩放（拖拽取消时回弹用）
+        /// </summary>
+        public void UpdateOriginalPosition(Vector3 position, Vector3 scale)
+        {
+            _originalPosition = position;
+            _originalScale = scale;
+        }
+
         private bool _initialized;
 
         private void Start()
@@ -116,9 +149,7 @@ namespace BlockPuzzle.Block
         }
 
         /// <summary>
-        /// 将方块锚点对齐到鼠标位置（加固定偏移）。
-        /// 方块锚点 = cell(0,0) 的世界位置 = 左下角格子中心，
-        /// 这样鼠标位置直接决定方块放置的 origin 格。
+        /// 将方块锚点（中心）对齐到鼠标位置（加固定偏移向上抬高避免遮挡）。
         /// </summary>
         private void SnapToPointer(Vector3 pointerWorld)
         {
@@ -132,9 +163,9 @@ namespace BlockPuzzle.Block
             if (BoardManager.Instance != null)
                 BoardManager.Instance.ClearPreview();
 
-            // 尝试放置
-            Vector3 blockWorldPos = transform.position;
-            Vector2Int gridPos = BoardManager.Instance.WorldToGrid(blockWorldPos);
+            // 方块锚点在中心，需要补偿到左下角格子坐标做 WorldToGrid
+            Vector3 originWorldPos = transform.position + GetCenterToOriginOffset();
+            Vector2Int gridPos = BoardManager.Instance.WorldToGrid(originWorldPos);
 
             if (BoardManager.Instance.CanPlace(_blockData.Cells, gridPos.x, gridPos.y))
             {
@@ -167,8 +198,9 @@ namespace BlockPuzzle.Block
 
         private void UpdatePreview()
         {
-            Vector3 blockWorldPos = transform.position;
-            Vector2Int gridPos = BoardManager.Instance.WorldToGrid(blockWorldPos);
+            // 方块锚点在中心，需要补偿到左下角格子坐标
+            Vector3 originWorldPos = transform.position + GetCenterToOriginOffset();
+            Vector2Int gridPos = BoardManager.Instance.WorldToGrid(originWorldPos);
 
             if (gridPos == _lastPreviewGrid) return;
             _lastPreviewGrid = gridPos;

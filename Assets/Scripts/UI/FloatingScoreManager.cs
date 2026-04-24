@@ -18,11 +18,23 @@ namespace BlockPuzzle.UI
         private Canvas _canvas;
         private RectTransform _canvasRect;
 
-        // 飘字配置
-        private const float FloatDuration = 1.2f;   // 飘字总持续时间
-        private const float FloatDistance = 120f;    // 向上飘动像素距离
-        private const float StaggerDelay = 0.25f;   // 每条飘字之间的间隔
-        private const int FloatFontSize = 52;        // 飘字字号
+        // --- Prefab 和可配置参数（Inspector 可调） ---
+        [Header("飘字 Prefab（可选，需含 Text + Outline 组件）")]
+        [Tooltip("飘字 Prefab。为空时代码创建 fallback。可在 Prefab 中调整字体、字号、描边等。")]
+        [SerializeField] private GameObject _floatingScorePrefab;
+
+        [Header("飘字动画配置")]
+        [Tooltip("飘字总持续时间（秒）")]
+        [SerializeField] private float _floatDuration = 1.2f;
+        [Tooltip("向上飘动像素距离")]
+        [SerializeField] private float _floatDistance = 120f;
+        [Tooltip("每条飘字之间的间隔（秒）")]
+        [SerializeField] private float _staggerDelay = 0.25f;
+        [Tooltip("飘字起始锚点位置（屏幕比例，0.65=偏上）")]
+        [SerializeField] private Vector2 _spawnAnchor = new Vector2(0.5f, 0.65f);
+
+        // fallback 字号（仅在无 Prefab 时使用）
+        private const int FallbackFontSize = 52;
 
         // 颜色
         private static readonly Color PlacementColor = Color.white;
@@ -47,6 +59,9 @@ namespace BlockPuzzle.UI
             _canvas = canvas;
             _canvasRect = canvas.GetComponent<RectTransform>();
         }
+
+        /// <summary>外部设置飘字 Prefab</summary>
+        public void SetFloatingScorePrefab(GameObject prefab) { if (_floatingScorePrefab == null) _floatingScorePrefab = prefab; }
 
         /// <summary>
         /// 添加放置分飘字
@@ -107,8 +122,8 @@ namespace BlockPuzzle.UI
             {
                 var entry = _pendingEntries.Dequeue();
                 SpawnFloatingText(entry.text, entry.color, yOffset);
-                yOffset += 60f; // 每条飘字错开一点高度
-                yield return new WaitForSeconds(StaggerDelay);
+                yOffset += 60f;
+                yield return new WaitForSeconds(_staggerDelay);
             }
 
             _isPlaying = false;
@@ -118,32 +133,51 @@ namespace BlockPuzzle.UI
         {
             if (_canvas == null) return;
 
-            var go = new GameObject("FloatingScore");
-            go.transform.SetParent(_canvas.transform, false);
+            GameObject go;
+            RectTransform rect;
+            Text txt;
 
-            var rect = go.AddComponent<RectTransform>();
-            // 在屏幕中上方（棋盘上方区域）生成
-            rect.anchorMin = new Vector2(0.5f, 0.65f);
-            rect.anchorMax = new Vector2(0.5f, 0.65f);
+            if (_floatingScorePrefab != null)
+            {
+                // Prefab 方式：字体、字号、描边等由 Prefab 决定
+                go = Instantiate(_floatingScorePrefab, _canvas.transform, false);
+                go.name = "FloatingScore";
+                rect = go.GetComponent<RectTransform>();
+                if (rect == null) rect = go.AddComponent<RectTransform>();
+                txt = go.GetComponent<Text>();
+                if (txt == null) txt = go.AddComponent<Text>();
+            }
+            else
+            {
+                // Fallback：代码创建
+                go = new GameObject("FloatingScore");
+                go.transform.SetParent(_canvas.transform, false);
+                rect = go.AddComponent<RectTransform>();
+                rect.sizeDelta = new Vector2(600, 80);
+
+                txt = go.AddComponent<Text>();
+                txt.fontSize = FallbackFontSize;
+                txt.alignment = TextAnchor.MiddleCenter;
+                txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (txt.font == null)
+                    txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+                txt.verticalOverflow = VerticalWrapMode.Overflow;
+
+                var outline = go.AddComponent<Outline>();
+                outline.effectColor = new Color(0, 0, 0, 0.8f);
+                outline.effectDistance = new Vector2(2, -2);
+            }
+
+            // 设置位置（使用可配置的锚点）
+            rect.anchorMin = _spawnAnchor;
+            rect.anchorMax = _spawnAnchor;
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = new Vector2(0f, yOffset);
-            rect.sizeDelta = new Vector2(600, 80);
 
-            var txt = go.AddComponent<Text>();
+            // 设置文字和颜色（无论 Prefab 还是 fallback 都由代码控制）
             txt.text = text;
-            txt.fontSize = FloatFontSize;
-            txt.alignment = TextAnchor.MiddleCenter;
             txt.color = color;
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (txt.font == null)
-                txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
-            txt.verticalOverflow = VerticalWrapMode.Overflow;
-
-            // 添加描边使飘字更醒目
-            var outline = go.AddComponent<Outline>();
-            outline.effectColor = new Color(0, 0, 0, 0.8f);
-            outline.effectDistance = new Vector2(2, -2);
 
             StartCoroutine(AnimateFloat(rect, txt));
         }
@@ -151,7 +185,7 @@ namespace BlockPuzzle.UI
         private IEnumerator AnimateFloat(RectTransform rect, Text txt)
         {
             Vector2 startPos = rect.anchoredPosition;
-            Vector2 endPos = startPos + new Vector2(0f, FloatDistance);
+            Vector2 endPos = startPos + new Vector2(0f, _floatDistance);
             Color startColor = txt.color;
 
             // 弹出动画：从 0.5 倍缩放到 1.2 倍再回到 1.0 倍
@@ -182,7 +216,7 @@ namespace BlockPuzzle.UI
 
             // 上飘 + 淡出阶段
             elapsed = 0f;
-            float fadeDuration = FloatDuration - 0.25f;
+            float fadeDuration = _floatDuration - 0.25f;
             // 先停留一会
             yield return new WaitForSeconds(0.3f);
 
