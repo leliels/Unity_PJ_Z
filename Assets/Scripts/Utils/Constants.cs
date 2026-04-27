@@ -33,7 +33,10 @@ namespace BlockPuzzle.Utils
         // --- 颜色 ---
         public static readonly Color PreviewValidColor = new Color(1f, 1f, 1f, 0.4f);
         public static readonly Color PreviewInvalidColor = new Color(1f, 0.3f, 0.3f, 0.4f);
-        public static readonly Color CellEmptyColor = new Color(0.2f, 0.2f, 0.25f, 1f);
+        public static readonly Color CellEmptyColor = new Color(0.2f, 0.2f, 0.25f, 0f);
+
+        /// <summary>拖拽预览时，放置后会消除的行/列的高亮颜色（由 SceneBootstrap Inspector 覆盖）</summary>
+        public static Color ClearPreviewHighlightColor = new Color(1f, 1f, 1f, 0.6f);
 
         /// <summary>
         /// 方块可用颜色（对应 SH1_0 ~ SH1_5）

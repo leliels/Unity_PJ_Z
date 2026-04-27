@@ -25,10 +25,13 @@ namespace BlockPuzzle.Core
         [Tooltip("方块单格 Prefab（需含 SpriteRenderer）")]
         [SerializeField] private GameObject _blockCellPrefab;
 
+        [Tooltip("候选区黑色底板 Sprite（DB_01.png）")]
+        [SerializeField] private Sprite _candidateBoardSprite;
+
         // ==================== UI Prefab 配置 ====================
         [Header("UI Prefab（可选，为空时代码创建 fallback）")]
-        [Tooltip("积分显示 Prefab（需含 Text 组件）。可在 Prefab 中调整字体、字号、颜色、位置。")]
-        [SerializeField] private GameObject _scoreTextPrefab;
+        [Tooltip("积分显示 Prefab（需含 NumberImageDisplay 组件）。为空时代码创建。")]
+        [SerializeField] private GameObject _scoreDisplayPrefab;
 
         [Tooltip("GameOver 面板 Prefab（需含子对象 FinalScoreText(Text) 和 RestartButton(Button)）")]
         [SerializeField] private GameObject _gameOverPanelPrefab;
@@ -56,6 +59,15 @@ namespace BlockPuzzle.Core
 
         [Tooltip("候选方块的缩放比例（相对于棋盘格子大小）")]
         [SerializeField] private float _candidateScale = 0.55f;
+
+        // ==================== 分数显示布局配置 ====================
+        [Header("分数显示布局")]
+        [SerializeField] private Vector2 _scoreAnchorMin = new Vector2(0.5f, 0.92f);
+        [SerializeField] private Vector2 _scoreAnchorMax = new Vector2(0.5f, 0.92f);
+        [SerializeField] private Vector2 _scoreAnchoredPosition = new Vector2(0f, -80f);
+        [SerializeField] private float _scoreDigitWidth = 50f;
+        [SerializeField] private float _scoreDigitHeight = 70f;
+        [SerializeField] private NumberImageDisplay.Alignment _scoreAlignment = NumberImageDisplay.Alignment.Center;
 
         // ==================== 显示格式配置 ====================
         [Header("分数显示格式")]
@@ -171,6 +183,7 @@ namespace BlockPuzzle.Core
             if (BlockSpawner.Instance != null)
             {
                 BlockSpawner.Instance.SetBlockCellPrefab(_blockCellPrefab);
+                BlockSpawner.Instance.SetCandidateBoardSprite(_candidateBoardSprite);
             }
 
             // ScoreManager
@@ -213,34 +226,43 @@ namespace BlockPuzzle.Core
                 esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
             }
 
-            // --- 分数文本 ---
-            GameObject scoreGo;
-            if (_scoreTextPrefab != null)
+            // --- 分数显示 ---
+            GameObject scoreDisplayGo;
+            if (_scoreDisplayPrefab != null && _scoreDisplayPrefab.GetComponent<NumberImageDisplay>() != null)
             {
-                // Prefab 方式：实例化预制体（字体、字号、颜色、位置都由 Prefab 决定）
-                scoreGo = Instantiate(_scoreTextPrefab, canvasGo.transform, false);
-                scoreGo.name = "ScoreText";
+                scoreDisplayGo = Instantiate(_scoreDisplayPrefab, canvasGo.transform, false);
+                scoreDisplayGo.name = "ScoreDisplay";
+                // 应用布局参数到实例
+                var display = scoreDisplayGo.GetComponent<NumberImageDisplay>();
+                display.DigitWidth = _scoreDigitWidth;
+                display.DigitHeight = _scoreDigitHeight;
+                display.TextAlignment = _scoreAlignment;
+                var rect = scoreDisplayGo.GetComponent<RectTransform>();
+                rect.anchorMin = _scoreAnchorMin;
+                rect.anchorMax = _scoreAnchorMax;
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = _scoreAnchoredPosition;
             }
             else
             {
-                // Fallback：代码创建
-                scoreGo = CreateUIText(canvasGo.transform, "ScoreText", "Score: 0",
-                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                    new Vector2(0, -80), new Vector2(400, 80), 52, TextAnchor.MiddleCenter, Color.white);
+                scoreDisplayGo = CreateNumberImageDisplay(canvasGo.transform,
+                    _scoreAnchorMin, _scoreAnchorMax, _scoreAnchoredPosition,
+                    _scoreDigitWidth, _scoreDigitHeight, _scoreAlignment);
             }
+
+            // 自动加载数字精灵（如果 Prefab 没有配置）
+            EnsureDigitSprites(scoreDisplayGo);
 
             // --- 游戏结束面板 ---
             GameObject gameOverPanel;
             if (_gameOverPanelPrefab != null)
             {
-                // Prefab 方式
                 gameOverPanel = Instantiate(_gameOverPanelPrefab, canvasGo.transform, false);
                 gameOverPanel.name = "GameOverPanel";
                 gameOverPanel.SetActive(false);
             }
             else
             {
-                // Fallback：代码创建
                 gameOverPanel = CreateGameOverPanel(canvasGo.transform);
             }
 
@@ -248,7 +270,7 @@ namespace BlockPuzzle.Core
             var gameUI = canvasGo.AddComponent<GameUI>();
 
             // 通过反射设置私有字段（因为是 SerializeField）
-            SetPrivateField(gameUI, "_scoreText", scoreGo.GetComponent<Text>());
+            SetPrivateField(gameUI, "_scoreDisplay", scoreDisplayGo.GetComponent<NumberImageDisplay>());
             SetPrivateField(gameUI, "_scoreFormat", _scoreFormat);
             SetPrivateField(gameUI, "_gameOverPanel", gameOverPanel);
             SetPrivateField(gameUI, "_finalScoreText", gameOverPanel.transform.Find("FinalScoreText")?.GetComponent<Text>());
@@ -285,6 +307,51 @@ namespace BlockPuzzle.Core
                     floatingMgr.PlayAll();
                 };
             }
+        }
+
+        /// <summary>用代码创建 NumberImageDisplay（无 Prefab 时的 fallback）</summary>
+        private GameObject CreateNumberImageDisplay(Transform parent,
+            Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos,
+            float digitW, float digitH, NumberImageDisplay.Alignment alignment)
+        {
+            var go = new GameObject("ScoreDisplay", typeof(RectTransform), typeof(NumberImageDisplay));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPos;
+
+            var display = go.GetComponent<NumberImageDisplay>();
+            display.DigitWidth = digitW;
+            display.DigitHeight = digitH;
+            display.TextAlignment = alignment;
+
+            return go;
+        }
+
+        /// <summary>
+        /// 自动加载 SH2 数字精灵到 NumberImageDisplay。
+        /// 如果组件已有有效精灵则跳过（Inspector 已配置）。
+        /// </summary>
+        private void EnsureDigitSprites(GameObject scoreGo)
+        {
+            if (scoreGo == null) return;
+            var display = scoreGo.GetComponent<NumberImageDisplay>();
+            if (display == null || display.HasValidSprites) return;
+
+            // 尝试从 Resources 加载 SH2_0~9 精灵
+            var sprites = new Sprite[10];
+            bool allLoaded = true;
+            for (int i = 0; i <= 9; i++)
+            {
+                sprites[i] = Resources.Load<Sprite>($"Digits/SH2_{i}");
+                if (sprites[i] == null) allLoaded = false;
+            }
+
+            if (allLoaded)
+                SetPrivateField(display, "_numberSprites", sprites);
         }
 
         private GameObject CreateGameOverPanel(Transform parent)
@@ -417,7 +484,30 @@ namespace BlockPuzzle.Core
                     if (ScoreManager.Instance != null)
                         gameUI.RefreshDisplay(ScoreManager.Instance.CurrentScore);
                 }
+
+                // 刷新分数显示布局参数
+                RefreshScoreDisplayLayout();
             };
+        }
+
+        /// <summary>运行时热更新分数显示的布局参数</summary>
+        private void RefreshScoreDisplayLayout()
+        {
+            var gameUI = FindFirstObjectByType<GameUI>();
+            if (gameUI == null) return;
+            // 通过反射获取 _scoreDisplay 字段
+            var field = typeof(GameUI).GetField("_scoreDisplay",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var display = field?.GetValue(gameUI) as NumberImageDisplay;
+            if (display == null) return;
+
+            display.DigitWidth = _scoreDigitWidth;
+            display.DigitHeight = _scoreDigitHeight;
+            display.TextAlignment = _scoreAlignment;
+            var rect = display.GetComponent<RectTransform>();
+            rect.anchorMin = _scoreAnchorMin;
+            rect.anchorMax = _scoreAnchorMax;
+            rect.anchoredPosition = _scoreAnchoredPosition;
         }
 #endif
     }

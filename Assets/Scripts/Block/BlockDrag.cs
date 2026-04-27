@@ -85,6 +85,9 @@ namespace BlockPuzzle.Block
             _mainCam = Camera.main;
             if (_mainCam == null) return;
             _collider = GetComponent<Collider2D>();
+            // 如果自身没有 Collider2D，尝试从子对象获取（如 Slot→Block 层级结构）
+            if (_collider == null)
+                _collider = GetComponentInChildren<Collider2D>();
             if (_collider == null) return;
             _originalPosition = transform.position;
             _originalScale = transform.localScale;
@@ -161,7 +164,10 @@ namespace BlockPuzzle.Block
             _isDragging = false;
 
             if (BoardManager.Instance != null)
+            {
                 BoardManager.Instance.ClearPreview();
+                BoardManager.Instance.ClearClearPreviewHighlight();
+            }
 
             // 方块锚点在中心，需要补偿到左下角格子坐标做 WorldToGrid
             Vector3 originWorldPos = transform.position + GetCenterToOriginOffset();
@@ -189,7 +195,10 @@ namespace BlockPuzzle.Block
         {
             _isDragging = false;
             if (BoardManager.Instance != null)
+            {
                 BoardManager.Instance.ClearPreview();
+                BoardManager.Instance.ClearClearPreviewHighlight();
+            }
             transform.position = _originalPosition;
             transform.localScale = _originalScale;
         }
@@ -207,6 +216,12 @@ namespace BlockPuzzle.Block
 
             bool valid = BoardManager.Instance.CanPlace(_blockData.Cells, gridPos.x, gridPos.y);
             BoardManager.Instance.ShowPreview(_blockData.Cells, gridPos.x, gridPos.y, valid);
+
+            // 消除预览高亮：如果放置后能填满行/列，高亮显示
+            if (valid)
+                BoardManager.Instance.ShowClearPreviewHighlight(_blockData.Cells, gridPos.x, gridPos.y);
+            else
+                BoardManager.Instance.ClearClearPreviewHighlight();
         }
 
         // ==================== 输入抽象（兼容新旧输入系统） ====================

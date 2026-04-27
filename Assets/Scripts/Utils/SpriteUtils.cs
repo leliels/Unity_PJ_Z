@@ -13,6 +13,7 @@ namespace BlockPuzzle.Utils
         private static Sprite _blockSprite;
         private static Sprite _cellSprite;
         private static Sprite _bgSprite;
+        private static Sprite _candidateBoardSprite;
 
         /// <summary>
         /// 获取一个1x1白色正方形 Sprite（缓存复用，作为 fallback）
@@ -63,6 +64,25 @@ namespace BlockPuzzle.Utils
                 if (_bgSprite == null)
                     _bgSprite = LoadSprite("Art/Backgrounds/bg_game");
                 return _bgSprite;
+            }
+        }
+
+        /// <summary>
+        /// 获取候选区黑色底板 Sprite（DB_01.png）
+        /// </summary>
+        public static Sprite CandidateBoardSprite
+        {
+            get
+            {
+                if (_candidateBoardSprite == null)
+                {
+                    _candidateBoardSprite = LoadSprite("Art/CandidateBoard/DB_01");
+#if UNITY_EDITOR
+                    if (_candidateBoardSprite == null)
+                        _candidateBoardSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/拆分资源/DB_01.png");
+#endif
+                }
+                return _candidateBoardSprite;
             }
         }
 

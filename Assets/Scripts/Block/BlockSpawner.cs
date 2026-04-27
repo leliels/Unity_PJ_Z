@@ -17,15 +17,22 @@ namespace BlockPuzzle.Block
         [Tooltip("方块单格 Prefab（需含 SpriteRenderer）。为空时使用代码创建 fallback。")]
         [SerializeField] private GameObject _blockCellPrefab;
 
-        /// <summary>所有候选方块用完后刷新事件</summary>
-        public event Action OnCandidatesRefreshed;
+        [Header("候选区底板")]
+        [Tooltip("候选槽位黑色底板 Sprite（DB_01.png）。为空则不显示底板。")]
+        [SerializeField] private Sprite _candidateBoardSprite;
 
         /// <summary>外部设置 Block Cell Prefab（供 SceneBootstrap 代码注入）</summary>
         public void SetBlockCellPrefab(GameObject prefab) { if (_blockCellPrefab == null) _blockCellPrefab = prefab; }
 
+        /// <summary>设置候选区底板 Sprite</summary>
+        public void SetCandidateBoardSprite(Sprite sprite) { if (_candidateBoardSprite == null) _candidateBoardSprite = sprite; }
+
+        /// <summary>所有候选方块用完后刷新事件</summary>
+        public event Action OnCandidatesRefreshed;
+
         // 候选方块数据（null 表示已被使用）
         private BlockData[] _candidateData;
-        // 候选方块 GameObject（null 表示已被使用）
+        // 候选槽位 GameObject（Slot 容器）
         private GameObject[] _candidateObjects;
         // 使用计数
         private int _usedCount;
@@ -43,6 +50,18 @@ namespace BlockPuzzle.Block
                     list.Add(_candidateData[i]);
             }
             return list;
+        }
+
+        /// <summary>
+        /// 获取指定索引的候选方块世界坐标（供 BlockDrag 使用）
+        /// </summary>
+        public Vector3 GetCandidateWorldPosition(int index)
+        {
+            if (_candidateObjects == null || index < 0 || index >= _candidateObjects.Length)
+                return Constants.CandidateCenter;
+            var slot = _candidateObjects[index];
+            if (slot == null) return Constants.CandidateCenter;
+            return slot.transform.position;
         }
 
         /// <summary>
@@ -116,19 +135,30 @@ namespace BlockPuzzle.Block
 
             for (int i = 0; i < Constants.CandidateCount; i++)
             {
-                var go = _candidateObjects[i];
-                if (go == null) continue;
+                var slot = _candidateObjects[i];
+                if (slot == null) continue;
 
                 Vector3 newPos = new Vector3(startX + i * Constants.CandidateSpacing, Constants.CandidateCenter.y, 0f);
-                go.transform.position = newPos;
-                go.transform.localScale = Vector3.one * Constants.CandidateScale;
+                slot.transform.position = newPos;
+                slot.transform.localScale = Vector3.one * Constants.CandidateScale;
 
-                // 同步更新子格子的间距和大小
-                RelayoutBlockCells(go, _candidateData[i]);
+                // 更新底板大小
+                var boardObj = slot.transform.Find("Board");
+                if (boardObj != null)
+                {
+                    float boardSize = 3.8f * Constants.CellSize;
+                    boardObj.localScale = new Vector3(boardSize, boardSize, 1f);
+                }
 
-                var drag = go.GetComponent<BlockDrag>();
-                if (drag != null)
-                    drag.UpdateOriginalPosition(newPos, Vector3.one * Constants.CandidateScale);
+                // 更新内部方块子格子的间距和大小
+                var blockObj = slot.transform.Find("Block");
+                if (blockObj != null)
+                {
+                    RelayoutBlockCells(blockObj.gameObject, _candidateData[i]);
+                    var drag = blockObj.GetComponent<BlockDrag>();
+                    if (drag != null)
+                        drag.UpdateOriginalPosition(newPos, Vector3.one * Constants.CandidateScale);
+                }
             }
         }
 
@@ -187,13 +217,50 @@ namespace BlockPuzzle.Block
 
                 Vector3 pos = new Vector3(startX + i * Constants.CandidateSpacing, Constants.CandidateCenter.y, 0f);
 
-                var blockGo = CreateBlockVisual(data, blockColor, pos, Constants.CandidateScale, _blockCellPrefab);
-                blockGo.name = $"Candidate_{i}_{data.ShapeName}";
+                // 创建 Slot 容器
+                var slotGo = new GameObject($"CandidateSlot_{i}");
+                slotGo.transform.position = pos;
+                slotGo.transform.localScale = Vector3.one * Constants.CandidateScale;
 
-                var drag = blockGo.AddComponent<BlockDrag>();
+                // --- 黑色底板（可选） ---
+                if (_candidateBoardSprite != null)
+                {
+                    var boardGo = new GameObject("Board");
+                    boardGo.transform.SetParent(slotGo.transform, false);
+                    boardGo.transform.localPosition = Vector3.zero;
+
+                    var sr = boardGo.AddComponent<SpriteRenderer>();
+                    sr.sprite = _candidateBoardSprite;
+                    sr.sortingOrder = 4; // 在背景之上，方块之下
+                    float boardSize = 3.8f * Constants.CellSize;
+                    boardGo.transform.localScale = new Vector3(boardSize, boardSize, 1f);
+                }
+
+                // --- 方块视觉 ---
+                var blockGo = CreateBlockVisual(data, blockColor, Vector3.zero, 1f, _blockCellPrefab);
+                blockGo.transform.SetParent(slotGo.transform, false);
+                blockGo.name = "Block";
+
+                // --- 将子对象 Block 的 Collider2D 复制到 Slot（供 BlockDrag 射线检测用） ---
+                var blockCollider = blockGo.GetComponent<Collider2D>();
+                if (blockCollider != null)
+                {
+                    var slotCollider = slotGo.GetComponent<BoxCollider2D>();
+                    if (slotCollider == null)
+                        slotCollider = slotGo.AddComponent<BoxCollider2D>();
+                    // 复制碰撞体参数
+                    if (blockCollider is BoxCollider2D box)
+                    {
+                        slotCollider.size = box.size;
+                        slotCollider.offset = box.offset;
+                    }
+                }
+
+                // BlockDrag 挂在 Slot 上，操作整个槽位
+                var drag = slotGo.AddComponent<BlockDrag>();
                 drag.Init(data, colorIndex, i);
 
-                _candidateObjects[i] = blockGo;
+                _candidateObjects[i] = slotGo;
             }
         }
 
@@ -217,8 +284,8 @@ namespace BlockPuzzle.Block
             {
                 if (cell.x < minX) minX = cell.x;
                 if (cell.y < minY) minY = cell.y;
-                if (cell.x > maxX) maxX = cell.x;
-                if (cell.y > maxY) maxY = cell.y;
+                if (cell.x < maxX) maxX = cell.x;
+                if (cell.y < maxY) maxY = cell.y;
             }
 
             float step = Constants.CellSize + Constants.CellSpacing;

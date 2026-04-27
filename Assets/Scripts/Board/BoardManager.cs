@@ -201,7 +201,10 @@ namespace BlockPuzzle.Board
 
             OnBlockPlaced?.Invoke(placedCount);
 
-            // 检测消除
+            // 先清除预览阶段的高亮（防止残留）
+            ClearClearPreviewHighlight();
+
+            // 检测并立即执行消除
             var (fullRows, fullCols) = MatchChecker.CheckMatches(_grid);
             int totalLines = fullRows.Count + fullCols.Count;
 
@@ -317,6 +320,70 @@ namespace BlockPuzzle.Board
                 if (sr != null) Destroy(sr.gameObject);
             }
             _previewRenderers.Clear();
+        }
+
+        // ==================== 消除预览高亮（拖拽时提示） ====================
+
+        private List<SpriteRenderer> _clearHighlightRenderers = new List<SpriteRenderer>();
+
+        /// <summary>
+        /// 显示消除预览高亮：模拟放置方块后，检测哪些行/列会被填满，并用高亮颜色标记。
+        /// 在拖拽预览阶段调用，给玩家"放这里可以消除"的视觉反馈。
+        /// </summary>
+        public void ShowClearPreviewHighlight(Vector2Int[] cells, int originCol, int originRow)
+        {
+            ClearClearPreviewHighlight();
+
+            // 模拟放置，临时标记格子
+            var simulatedGrid = (bool[,])_grid.Clone();
+            foreach (var cell in cells)
+            {
+                int c = originCol + cell.x;
+                int r = originRow + cell.y;
+                if (IsInsideBoard(c, r))
+                    simulatedGrid[c, r] = true;
+            }
+
+            // 检测模拟放置后的满行/满列
+            var (fullRows, fullCols) = MatchChecker.CheckMatches(simulatedGrid);
+            if (fullRows.Count == 0 && fullCols.Count == 0) return;
+
+            // 收集需要高亮的格子坐标（去重）
+            var highlightSet = new HashSet<(int, int)>();
+            foreach (int row in fullRows)
+                for (int col = 0; col < Constants.BoardCols; col++)
+                    highlightSet.Add((col, row));
+            foreach (int col in fullCols)
+                for (int row = 0; row < Constants.BoardRows; row++)
+                    highlightSet.Add((col, row));
+
+            // 为每个要消除的格子创建高亮覆盖层（不修改原始格子颜色）
+            Color hlColor = Constants.ClearPreviewHighlightColor;
+            foreach (var (col, row) in highlightSet)
+            {
+                GameObject go = new GameObject("ClearHighlight");
+                go.transform.position = GridToWorld(col, row);
+                go.transform.localScale = Vector3.one * Constants.CellSize;
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = SpriteUtils.CellSprite;
+                sr.color = hlColor;
+                sr.sortingOrder = 3; // 在普通格子(0)之上、放置预览(5)之下
+
+                _clearHighlightRenderers.Add(sr);
+            }
+        }
+
+        /// <summary>
+        /// 清除所有消除预览高亮
+        /// </summary>
+        public void ClearClearPreviewHighlight()
+        {
+            foreach (var sr in _clearHighlightRenderers)
+            {
+                if (sr != null) Destroy(sr.gameObject);
+            }
+            _clearHighlightRenderers.Clear();
         }
 
         // ==================== 运行时重新布局 ====================

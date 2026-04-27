@@ -11,18 +11,12 @@ namespace BlockPuzzle.UI
     public class GameUI : MonoBehaviour
     {
         [Header("HUD")]
-        [SerializeField] private Text _scoreText;
-
-        [Tooltip("分数显示格式。用 {0} 代表分数数字。\n例：\"Score: {0}\"、\"分数\\n{0}\"、\"{0}\"")]
-        [SerializeField] private string _scoreFormat = "Score: {0}";
+        [SerializeField] private NumberImageDisplay _scoreDisplay;
 
         [Header("Game Over Panel")]
         [SerializeField] private GameObject _gameOverPanel;
         [SerializeField] private Text _finalScoreText;
         [SerializeField] private Button _restartButton;
-
-        [Tooltip("结算分数显示格式。用 {0} 代表分数数字。\n例：\"Final Score\\n{0}\"、\"最终得分\\n{0}\"")]
-        [SerializeField] private string _finalScoreFormat = "Final Score\n{0}";
 
         private void Start()
         {
@@ -55,8 +49,8 @@ namespace BlockPuzzle.UI
 
         private void UpdateScoreDisplay(int score)
         {
-            if (_scoreText != null)
-                _scoreText.text = string.Format(_scoreFormat, score);
+            if (_scoreDisplay != null)
+                _scoreDisplay.SetNumber(score);
         }
 
         /// <summary>
@@ -86,7 +80,7 @@ namespace BlockPuzzle.UI
                 _gameOverPanel.SetActive(true);
 
                 if (_finalScoreText != null)
-                    _finalScoreText.text = string.Format(_finalScoreFormat, ScoreManager.Instance.CurrentScore);
+                    _finalScoreText.text = $"Final Score\n{ScoreManager.Instance.CurrentScore}";
             }
         }
 
