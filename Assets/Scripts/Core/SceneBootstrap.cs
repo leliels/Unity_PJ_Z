@@ -25,8 +25,13 @@ namespace BlockPuzzle.Core
         [Tooltip("方块单格 Prefab（需含 SpriteRenderer）")]
         [SerializeField] private GameObject _blockCellPrefab;
 
-        [Tooltip("候选区黑色底板 Sprite（DB_01.png）")]
+        [Tooltip("候选区黑色底板 Sprite（DB_01.png）。无 Slot Prefab 时的 fallback。")]
         [SerializeField] private Sprite _candidateBoardSprite;
+
+        [Tooltip("候选槽位 Prefab（可选）。美术可在 Prefab 内自由调整底板大小/位置/装饰。\n"
+               + "约定：Prefab 内名为 'BlockAnchor' 的子对象将作为方块的挂载点（找不到则挂在根节点下）。\n"
+               + "为空时走代码创建 + Sprite 底板 fallback。")]
+        [SerializeField] private GameObject _candidateSlotPrefab;
 
         // ==================== UI Prefab 配置 ====================
         [Header("UI Prefab（可选，为空时代码创建 fallback）")]
@@ -184,6 +189,7 @@ namespace BlockPuzzle.Core
             {
                 BlockSpawner.Instance.SetBlockCellPrefab(_blockCellPrefab);
                 BlockSpawner.Instance.SetCandidateBoardSprite(_candidateBoardSprite);
+                BlockSpawner.Instance.SetCandidateSlotPrefab(_candidateSlotPrefab);
             }
 
             // ScoreManager
@@ -232,6 +238,7 @@ namespace BlockPuzzle.Core
             {
                 scoreDisplayGo = Instantiate(_scoreDisplayPrefab, canvasGo.transform, false);
                 scoreDisplayGo.name = "ScoreDisplay";
+                scoreDisplayGo.SetActive(true); // 确保激活（Prefab 可能是 inactive 的）
                 // 应用布局参数到实例
                 var display = scoreDisplayGo.GetComponent<NumberImageDisplay>();
                 display.DigitWidth = _scoreDigitWidth;

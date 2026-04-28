@@ -373,7 +373,7 @@ MonoBehaviour:
   _previewPrefab: {fileID: 3338880705683207701, guid: 365cd0dba80e38e49bbb28076ba34b37, type: 3}
   _blockCellPrefab: {fileID: 5453268057963300775, guid: f4bc83c121d1d9a4c9ef8a71061407ca, type: 3}
   _candidateBoardSprite: {fileID: 0}
-  _scoreDisplayPrefab: {fileID: 0}
+  _scoreDisplayPrefab: {fileID: 7483291058124688001, guid: 7074780b27ecf7c45871cb599ea82f54, type: 3}
   _gameOverPanelPrefab: {fileID: 0}
   _floatingScorePrefab: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
   _boardCenter: {x: 0, y: -0.1, z: 0}

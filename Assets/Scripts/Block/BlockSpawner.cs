@@ -18,14 +18,20 @@ namespace BlockPuzzle.Block
         [SerializeField] private GameObject _blockCellPrefab;
 
         [Header("候选区底板")]
-        [Tooltip("候选槽位黑色底板 Sprite（DB_01.png）。为空则不显示底板。")]
+        [Tooltip("候选槽位黑色底板 Sprite（DB_01.png）。无 Slot Prefab 时的 fallback。")]
         [SerializeField] private Sprite _candidateBoardSprite;
+
+        [Tooltip("候选槽位 Prefab（可选）。Prefab 内名为 'BlockAnchor' 的子对象将作为方块挂载点。")]
+        [SerializeField] private GameObject _candidateSlotPrefab;
 
         /// <summary>外部设置 Block Cell Prefab（供 SceneBootstrap 代码注入）</summary>
         public void SetBlockCellPrefab(GameObject prefab) { if (_blockCellPrefab == null) _blockCellPrefab = prefab; }
 
         /// <summary>设置候选区底板 Sprite</summary>
         public void SetCandidateBoardSprite(Sprite sprite) { if (_candidateBoardSprite == null) _candidateBoardSprite = sprite; }
+
+        /// <summary>设置候选槽位 Prefab</summary>
+        public void SetCandidateSlotPrefab(GameObject prefab) { if (_candidateSlotPrefab == null) _candidateSlotPrefab = prefab; }
 
         /// <summary>所有候选方块用完后刷新事件</summary>
         public event Action OnCandidatesRefreshed;
@@ -151,7 +157,9 @@ namespace BlockPuzzle.Block
                 }
 
                 // 更新内部方块子格子的间距和大小
-                var blockObj = slot.transform.Find("Block");
+                // 兼容 Prefab 模式（BlockAnchor 子节点下）和 fallback 模式（直接在 Slot 下）
+                Transform blockAnchor = slot.transform.Find("BlockAnchor") ?? slot.transform;
+                var blockObj = blockAnchor.Find("Block");
                 if (blockObj != null)
                 {
                     RelayoutBlockCells(blockObj.gameObject, _candidateData[i]);
@@ -217,28 +225,48 @@ namespace BlockPuzzle.Block
 
                 Vector3 pos = new Vector3(startX + i * Constants.CandidateSpacing, Constants.CandidateCenter.y, 0f);
 
-                // 创建 Slot 容器
-                var slotGo = new GameObject($"CandidateSlot_{i}");
-                slotGo.transform.position = pos;
-                slotGo.transform.localScale = Vector3.one * Constants.CandidateScale;
+                GameObject slotGo;
+                Transform blockAnchor;
 
-                // --- 黑色底板（可选） ---
-                if (_candidateBoardSprite != null)
+                if (_candidateSlotPrefab != null)
                 {
-                    var boardGo = new GameObject("Board");
-                    boardGo.transform.SetParent(slotGo.transform, false);
-                    boardGo.transform.localPosition = Vector3.zero;
+                    // === Prefab 模式：美术可在 Prefab 内自由调整底板布局 ===
+                    slotGo = Instantiate(_candidateSlotPrefab);
+                    slotGo.SetActive(true);
+                    slotGo.name = $"CandidateSlot_{i}";
+                    slotGo.transform.position = pos;
+                    slotGo.transform.localScale = Vector3.one * Constants.CandidateScale;
 
-                    var sr = boardGo.AddComponent<SpriteRenderer>();
-                    sr.sprite = _candidateBoardSprite;
-                    sr.sortingOrder = 4; // 在背景之上，方块之下
-                    float boardSize = 3.8f * Constants.CellSize;
-                    boardGo.transform.localScale = new Vector3(boardSize, boardSize, 1f);
+                    // 查找方块挂载点：优先找名为 "BlockAnchor" 的子对象，找不到就用根节点
+                    var anchorTf = slotGo.transform.Find("BlockAnchor");
+                    blockAnchor = anchorTf != null ? anchorTf : slotGo.transform;
+                }
+                else
+                {
+                    // === Fallback 模式：代码创建 Slot + 可选 Sprite 底板 ===
+                    slotGo = new GameObject($"CandidateSlot_{i}");
+                    slotGo.transform.position = pos;
+                    slotGo.transform.localScale = Vector3.one * Constants.CandidateScale;
+
+                    if (_candidateBoardSprite != null)
+                    {
+                        var boardGo = new GameObject("Board");
+                        boardGo.transform.SetParent(slotGo.transform, false);
+                        boardGo.transform.localPosition = Vector3.zero;
+
+                        var sr = boardGo.AddComponent<SpriteRenderer>();
+                        sr.sprite = _candidateBoardSprite;
+                        sr.sortingOrder = 4;
+                        float boardSize = 3.8f * Constants.CellSize;
+                        boardGo.transform.localScale = new Vector3(boardSize, boardSize, 1f);
+                    }
+
+                    blockAnchor = slotGo.transform;
                 }
 
                 // --- 方块视觉 ---
                 var blockGo = CreateBlockVisual(data, blockColor, Vector3.zero, 1f, _blockCellPrefab);
-                blockGo.transform.SetParent(slotGo.transform, false);
+                blockGo.transform.SetParent(blockAnchor, false);
                 blockGo.name = "Block";
 
                 // --- 将子对象 Block 的 Collider2D 复制到 Slot（供 BlockDrag 射线检测用） ---
