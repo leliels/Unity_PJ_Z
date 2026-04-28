@@ -68,6 +68,9 @@ namespace BlockPuzzle.Core
         [Tooltip("候选区背景底板大小（世界单位）。值越大，底板越大。默认 4.5，建议范围 3.0~6.0。")]
         [SerializeField] private float _candidateBoardSize = 4.5f;
 
+        [Tooltip("宽松候选区拖拽：手指在候选区范围内任意位置即可拖动最近的方块，无需精准点击轮廓。")]
+        [SerializeField] private bool _looseCandidateDrag = true;
+
         // ==================== 分数显示布局配置 ====================
         [Header("分数显示布局")]
         [SerializeField] private Vector2 _scoreAnchorMin = new Vector2(0.5f, 0.92f);
@@ -124,6 +127,13 @@ namespace BlockPuzzle.Core
 
         [Tooltip("结算分数格式。{0}=分数数字。例：\"Final Score\\n{0}\"、\"最终得分\\n{0}\"")]
         [SerializeField] private string _finalScoreFormat = "Final Score\n{0}";
+
+        // ==================== BoardManager Prefab 配置 ====================
+        [Header("BoardManager Prefab（推荐）")]
+        [Tooltip("BoardManager Prefab（如 [BoardManager].prefab）。\n"
+               + "挂载后代码会实例化此 Prefab 作为 BoardManager，使用其上的参数配置。\n"
+               + "为空时代码创建空 BoardManager（使用默认参数）。")]
+        [SerializeField] private GameObject _boardManagerPrefab;
 
         // ==================== HUD 按钮配置 ====================
         [Header("HUD 按钮 Prefab（可选）")]
@@ -214,13 +224,23 @@ namespace BlockPuzzle.Core
 
         private void CreateManagers()
         {
-            // BoardManager
+            // BoardManager：优先使用 Prefab 实例化，否则代码创建
             if (FindFirstObjectByType<BoardManager>() == null)
             {
-                var boardGo = new GameObject("[BoardManager]");
-                boardGo.AddComponent<BoardManager>();
+                if (_boardManagerPrefab != null)
+                {
+                    var boardGo = Instantiate(_boardManagerPrefab);
+                    boardGo.name = "[BoardManager]";
+                    boardGo.SetActive(true);
+                    // Prefab 上已经有 BoardManager 组件和配置参数，直接使用
+                }
+                else
+                {
+                    var boardGo = new GameObject("[BoardManager]");
+                    boardGo.AddComponent<BoardManager>();
+                }
             }
-            // 注入 Prefab 引用
+            // 注入 Prefab 引用（补充 Prefab 中可能缺失的引用）
             if (BoardManager.Instance != null)
             {
                 BoardManager.Instance.SetCellPrefab(_cellPrefab);
@@ -240,6 +260,7 @@ namespace BlockPuzzle.Core
                 BlockSpawner.Instance.SetCandidateBoardSprite(_candidateBoardSprite);
                 BlockSpawner.Instance.SetCandidateBoardSize(_candidateBoardSize);
                 BlockSpawner.Instance.SetCandidateSlotPrefab(_candidateSlotPrefab);
+                BlockSpawner.Instance.SetLooseCandidateDrag(_looseCandidateDrag);
             }
 
             // ScoreManager

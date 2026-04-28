@@ -39,6 +39,40 @@ namespace BlockPuzzle.Block
         /// <summary>设置候选槽位 Prefab</summary>
         public void SetCandidateSlotPrefab(GameObject prefab) { if (_candidateSlotPrefab == null) _candidateSlotPrefab = prefab; }
 
+        /// <summary>宽松候选区拖拽模式（由 SceneBootstrap 注入）</summary>
+        private bool _looseCandidateDrag;
+
+        /// <summary>设置宽松候选区拖拽模式</summary>
+        public void SetLooseCandidateDrag(bool enabled) { _looseCandidateDrag = enabled; }
+
+        /// <summary>
+        /// 判断指定世界坐标落在哪个候选槽位的领地内（宽松模式专用）。
+        /// 领地规则：3个候选位等间距排列，每个占 CandidateSpacing 宽度的区域。
+        /// 手指在哪个区域内就只能拖哪个方块，空位返回 -1。
+        /// </summary>
+        public int GetClosestCandidateIndex(Vector2 pointerWorld)
+        {
+            if (_candidateObjects == null) return -1;
+
+            float totalWidth = (Constants.CandidateCount - 1) * Constants.CandidateSpacing;
+            float startX = Constants.CandidateCenter.x - totalWidth / 2f;
+            // 每个槽位领地的半宽 = 相邻两个槽位距离的一半
+            float slotHalfWidth = Constants.CandidateSpacing / 2f;
+
+            for (int i = 0; i < _candidateObjects.Length; i++)
+            {
+                // 该槽位是否有方块
+                if (_candidateObjects[i] == null || _candidateData[i] == null) continue;
+
+                float slotCenterX = startX + i * Constants.CandidateSpacing;
+
+                // 判断手指 X 是否在此槽位的领地内
+                if (Mathf.Abs(pointerWorld.x - slotCenterX) <= slotHalfWidth)
+                    return i;
+            }
+            return -1;
+        }
+
         /// <summary>所有候选方块用完后刷新事件</summary>
         public event Action OnCandidatesRefreshed;
 
@@ -329,6 +363,7 @@ namespace BlockPuzzle.Block
                 // BlockDrag 挂在 Slot 上，操作整个槽位
                 var drag = slotGo.AddComponent<BlockDrag>();
                 drag.Init(data, colorIndex, i);
+                drag.SetLooseCandidateDrag(_looseCandidateDrag);
 
                 _candidateObjects[i] = slotGo;
             }

@@ -24,6 +24,15 @@ namespace BlockPuzzle.Block
         private Camera _mainCam;
         private Collider2D _collider;
 
+        /// <summary>
+        /// 候选区宽松拖拽模式：手指在候选区范围内任意位置即可拖动最近的方块。
+        /// 由 SceneBootstrap 注入，默认 false（精准点击模式）。
+        /// </summary>
+        private bool _looseCandidateDrag;
+
+        /// <summary>设置宽松候选区拖拽模式</summary>
+        public void SetLooseCandidateDrag(bool enabled) { _looseCandidateDrag = enabled; }
+
         // 拖拽时方块锚点相对鼠标的固定偏移：向上抬高一些，避免手指/光标遮挡
         // 并向左下偏移半格，让"鼠标尖端"对齐方块左下角格子的中心
         private static readonly Vector3 DragAnchorOffset = new Vector3(0f, 2.0f, 0f);
@@ -115,12 +124,30 @@ namespace BlockPuzzle.Block
 
             if (!_isDragging && pointerDown)
             {
-                // 射线检测：点击的是否是自己
                 Vector3 pointerWorld = GetPointerWorldPos();
-                var hit = Physics2D.OverlapPoint(pointerWorld);
-                if (hit != null && hit == _collider)
+
+                if (_looseCandidateDrag)
                 {
-                    BeginDrag(pointerWorld);
+                    // 宽松模式：候选区 Y 范围内，由 BlockSpawner 统一仲裁最近的方块
+                    float candidateY = Constants.CandidateCenter.y;
+                    float candidateHalfHeight = 3.0f; // 候选区上下容差范围（世界单位）
+                    if (Mathf.Abs(pointerWorld.y - candidateY) < candidateHalfHeight
+                        && BlockSpawner.Instance != null)
+                    {
+                        int closestIdx = BlockSpawner.Instance.GetClosestCandidateIndex(
+                            new Vector2(pointerWorld.x, pointerWorld.y));
+                        if (closestIdx == _candidateIndex)
+                            BeginDrag(pointerWorld);
+                    }
+                }
+                else
+                {
+                    // 精准模式：射线检测，点击的是否是自己的 Collider
+                    var hit = Physics2D.OverlapPoint(pointerWorld);
+                    if (hit != null && hit == _collider)
+                    {
+                        BeginDrag(pointerWorld);
+                    }
                 }
             }
             else if (_isDragging && pointerHeld)
@@ -138,8 +165,9 @@ namespace BlockPuzzle.Block
         private void BeginDrag(Vector3 pointerWorld)
         {
             _isDragging = true;
-            // 拖拽时放大到原始大小（候选区是缩小显示）
-            transform.localScale = Vector3.one;
+            // 拖拽时缩放到与棋盘格子一致的大小（棋盘有 VisualScale 缩放）
+            float dragScale = BoardManager.Instance != null ? BoardManager.Instance.VisualScale : 1f;
+            transform.localScale = Vector3.one * dragScale;
             // 立即把方块锚点对齐到"鼠标指向的格子中心"上方
             SnapToPointer(pointerWorld);
         }

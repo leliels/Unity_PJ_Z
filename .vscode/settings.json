@@ -67,5 +67,6 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "Unity_PJ_Z.slnx"
+    "dotnet.defaultSolution": "Unity_PJ_Z.slnx",
+    "markdown.validate.enabled": false
 }
