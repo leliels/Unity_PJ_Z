@@ -372,7 +372,8 @@ MonoBehaviour:
   _cellPrefab: {fileID: 4684049486210500372, guid: 6d719c266e4280e4d9407a82622d01cd, type: 3}
   _previewPrefab: {fileID: 3338880705683207701, guid: 365cd0dba80e38e49bbb28076ba34b37, type: 3}
   _blockCellPrefab: {fileID: 5453268057963300775, guid: f4bc83c121d1d9a4c9ef8a71061407ca, type: 3}
-  _scoreTextPrefab: {fileID: 6965219356388686758, guid: 41514ce185ed82540a32c74f98a00317, type: 3}
+  _candidateBoardSprite: {fileID: 0}
+  _scoreDisplayPrefab: {fileID: 0}
   _gameOverPanelPrefab: {fileID: 0}
   _floatingScorePrefab: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
   _boardCenter: {x: 0, y: -0.1, z: 0}
@@ -381,6 +382,12 @@ MonoBehaviour:
   _candidateCenter: {x: 0, y: -8.5, z: 0}
   _candidateSpacing: 3.5
   _candidateScale: 0.6
+  _scoreAnchorMin: {x: 0.5, y: 0.92}
+  _scoreAnchorMax: {x: 0.5, y: 0.92}
+  _scoreAnchoredPosition: {x: 0, y: -80}
+  _scoreDigitWidth: 50
+  _scoreDigitHeight: 70
+  _scoreAlignment: 1
   _scoreFormat: "\u5206\u6570: {0}"
   _finalScoreFormat: "\u6700\u7EC8\u5F97\u5206\n{0}"
   _restartButtonPrefab: {fileID: 5453980460094230541, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
@@ -551,6 +558,10 @@ PrefabInstance:
     - target: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
       propertyPath: m_Name
       value: FloatingScore
+      objectReference: {fileID: 0}
+    - target: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

@@ -254,6 +254,9 @@ namespace BlockPuzzle.Block
                         slotCollider.size = box.size;
                         slotCollider.offset = box.offset;
                     }
+                    // 销毁 Block 子对象上的碰撞体，避免 Physics2D.OverlapPoint
+                    // 命中子碰撞体而非 Slot 碰撞体，导致拖拽检测失败
+                    Destroy(blockCollider);
                 }
 
                 // BlockDrag 挂在 Slot 上，操作整个槽位
@@ -284,8 +287,8 @@ namespace BlockPuzzle.Block
             {
                 if (cell.x < minX) minX = cell.x;
                 if (cell.y < minY) minY = cell.y;
-                if (cell.x < maxX) maxX = cell.x;
-                if (cell.y < maxY) maxY = cell.y;
+                if (cell.x > maxX) maxX = cell.x;
+                if (cell.y > maxY) maxY = cell.y;
             }
 
             float step = Constants.CellSize + Constants.CellSpacing;
