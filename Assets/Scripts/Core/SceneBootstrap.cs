@@ -367,15 +367,34 @@ namespace BlockPuzzle.Core
             floatingMgr.Init(canvas);
             floatingMgr.SetFloatingScorePrefab(_floatingScorePrefab);
 
-            // 监听消除计分事件，驱动飘字
+            // 监听消除计分事件，驱动飘字（设计文档 123-131 流程）
+            // ① 放置分飘字 → ② 消除分飘字 → ③ Combo 飘字 → ④ 播完 → 总分跳动
             if (Score.ScoreManager.Instance != null)
             {
                 Score.ScoreManager.Instance.OnLineClearScoreDetail += (lineCount, baseScore, comboBonus, comboCount) =>
                 {
+                    // ① 显示放置分飘字（如 "+4"）— 从 _lastPlacementScore 反推 cellCount（baseScore 为 long，需显式转 int）
+                    floatingMgr.EnqueuePlacementScore(baseScore > 0 ? (int)(baseScore / (lineCount * 2 - 1)) : lineCount);
+                    // ② 逐行显示消除分飘字（如 "×2 +16"、"+256"）
                     floatingMgr.EnqueueClearScore(baseScore, lineCount);
-                    if (comboBonus > 0)
-                        floatingMgr.EnqueueComboBonus(comboCount, Utils.Constants.GetComboMultiplier(comboCount), comboBonus);
+                    // ③ 如果有 Combo → 显示 Combo 加成飘字（如 "Combo ×1 → ×1.2"）
+                    if (comboCount > 0)
+                        floatingMgr.EnqueueComboBonus(comboCount, Utils.Constants.GetComboMultiplier(comboCount));
+                    // 开始播放所有飘字
                     floatingMgr.PlayAll();
+                };
+
+                // ④ 所有飘字展示完毕后 → 总分数字有跳动效果
+                floatingMgr.OnAllFinished += () =>
+                {
+                    var gameUI = FindFirstObjectByType<GameUI>();
+                    if (gameUI != null)
+                    {
+                        var scoreField = typeof(GameUI).GetField("_scoreDisplay",
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        var display = scoreField?.GetValue(gameUI) as NumberImageDisplay;
+                        display?.PlayBounceEffect();
+                    }
                 };
             }
         }

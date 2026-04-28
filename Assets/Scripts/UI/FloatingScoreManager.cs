@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,6 +13,12 @@ namespace BlockPuzzle.UI
     /// 消除得分飘字管理器：
     /// 消除发生时逐条展示每项得分（放置分、消除分、Combo 加成），
     /// 播完后汇入总分并触发总分跳动效果。
+    ///
+    /// 流程（对应设计文档 123-131）：
+    /// ① 显示放置分飘字（如 "+4"）
+    /// ② 逐行显示消除分飘字（如 "+16"、"+256"）
+    /// ③ 如果有 Combo → 显示 Combo 加成飘字（如 "Combo ×1 → ×1.2"）
+    /// ④ 所有飘字展示完毕后 → 触发 OnAllFinished 回调 → 总分跳动
     /// </summary>
     public class FloatingScoreManager : MonoBehaviour
     {
@@ -44,6 +51,9 @@ namespace BlockPuzzle.UI
         // 待显示的飘字队列
         private Queue<FloatEntry> _pendingEntries = new Queue<FloatEntry>();
         private bool _isPlaying;
+
+        /// <summary>所有飘字播放完毕事件</summary>
+        public event Action OnAllFinished;
 
         private struct FloatEntry
         {
@@ -92,14 +102,16 @@ namespace BlockPuzzle.UI
         }
 
         /// <summary>
-        /// 添加 Combo 加成飘字
+        /// 添加 Combo 加成飘字（格式：Combo ×N → ×M）
         /// </summary>
-        public void EnqueueComboBonus(int comboCount, float multiplier, long bonusScore)
+        public void EnqueueComboBonus(int comboCount, float multiplier)
         {
-            if (bonusScore <= 0) return;
+            if (comboCount <= 0) return;
+            // 设计文档 129 行格式："Combo ×1 → ×1.2"
+            float nextMultiplier = 1f + (comboCount + 1) * 0.2f; // 下一次 Combo 系数
             _pendingEntries.Enqueue(new FloatEntry
             {
-                text = $"Combo ×{comboCount} (+{bonusScore})",
+                text = $"Combo ×{comboCount} → ×{nextMultiplier:F1}",
                 color = ComboColor
             });
         }
@@ -126,7 +138,13 @@ namespace BlockPuzzle.UI
                 yield return new WaitForSeconds(_staggerDelay);
             }
 
+            // 等待最后一条飘字的动画播完（上飘 + 淡出）
+            yield return new WaitForSeconds(_floatDuration);
+
             _isPlaying = false;
+
+            // 通知所有飘字已播放完毕 → 触发总分跳动
+            OnAllFinished?.Invoke();
         }
 
         private void SpawnFloatingText(string text, Color color, float yOffset)

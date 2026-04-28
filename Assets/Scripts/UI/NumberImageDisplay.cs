@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -5,6 +6,7 @@ namespace BlockPuzzle.UI
 {
     /// <summary>
     /// 用数字图片精灵显示数值的 UI 组件
+    /// 支持分数变化时的跳动动画效果
     /// </summary>
     [RequireComponent(typeof(RectTransform))]
     public class NumberImageDisplay : MonoBehaviour
@@ -19,6 +21,12 @@ namespace BlockPuzzle.UI
         [SerializeField] private float _digitHeight = 70f;
         [SerializeField] private float _spacing = 5f;
         [SerializeField] private Alignment _alignment = Alignment.Center;
+
+        [Header("跳动动画（飘字播放完毕后触发）")]
+        [Tooltip("跳动缩放峰值（1.0=不跳，1.3=放大30%）")]
+        [SerializeField] private float _bounceScale = 1.3f;
+        [Tooltip("跳动动画时长（秒）")]
+        [SerializeField] private float _bounceDuration = 0.35f;
 
         private readonly Image[] _digitImages = new Image[10];
         private RectTransform _rectTransform;
@@ -71,6 +79,45 @@ namespace BlockPuzzle.UI
             _lastValue = value;
             if (_digitImages[0] != null)
                 RefreshDisplay();
+        }
+
+        /// <summary>
+        /// 播放分数跳动动画（飘字全部播完后调用）
+        /// 设计文档 131 行：总分数字有跳动效果
+        /// </summary>
+        public void PlayBounceEffect()
+        {
+            if (_rectTransform == null) _rectTransform = GetComponent<RectTransform>();
+            StopAllCoroutines();
+            StartCoroutine(BounceCoroutine());
+        }
+
+        private IEnumerator BounceCoroutine()
+        {
+            // 放大到峰值
+            float half = _bounceDuration * 0.5f;
+            float elapsed = 0f;
+            while (elapsed < half)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / half;
+                // ease-out quad
+                float s = 1f + (_bounceScale - 1f) * (1f - (1f - t) * (1f - t));
+                _rectTransform.localScale = Vector3.one * s;
+                yield return null;
+            }
+            // 回弹到正常大小
+            elapsed = 0f;
+            while (elapsed < half)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / half;
+                // ease-out quad
+                float s = _bounceScale - (_bounceScale - 1f) * (1f - (1f - t) * (1f - t));
+                _rectTransform.localScale = Vector3.one * s;
+                yield return null;
+            }
+            _rectTransform.localScale = Vector3.one;
         }
 
         private void RefreshDisplay()

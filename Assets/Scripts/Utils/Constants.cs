@@ -21,10 +21,14 @@ namespace BlockPuzzle.Utils
         public static float CandidateScale = 0.55f;     // 候选方块缩放比例
         public static float CandidateSpacing = 3.6f;    // 候选方块间距
 
-        // --- 计分规则（2026-04-23 新版） ---
+        // --- 计分规则（2026-04-28 排分制） ---
         public const int ScorePerCell = 1;               // 放置每格分数
-        public const int LineClearBase = 16;              // 消除基数 = 棋盘列数(8) × 2
-        public const float ComboMultiplierStep = 0.2f;    // 每次 Combo 增加的系数
+        /// <summary>Combo 加成基数</summary>
+        public const int ComboBaseScore = 20;            // Combo 部分的基础系数
+
+        // --- 旧计分常量（保留兼容，已不再使用） ---
+        [System.Obsolete("排分制不再使用 16^N 公式，请使用 ScoreManager 内部公式", false)] public const int LineClearBase = 0;
+        [System.Obsolete("排分制不再使用线性 Combo 系数，请使用 ScoreManager 内部公式", false)] public const float ComboMultiplierStep = 0f;
 
         // --- 布局位置（可在 Inspector 调整） ---
         public static Vector3 BoardCenter = new Vector3(0f, 1.1f, 0f);
