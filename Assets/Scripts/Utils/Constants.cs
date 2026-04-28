@@ -13,7 +13,7 @@ namespace BlockPuzzle.Utils
         public const int BoardCols = 8;
 
         // --- 棋盘视觉（可在 Inspector 调整） ---
-        public static float CellSize = 1.18f;          // 每个格子的世界单位大小
+        public static float CellSize = 1.0f;              // 每个格子的世界单位大小
         public static float CellSpacing = 0.08f;       // 格子间距
 
         // --- 候选方块（可在 Inspector 调整） ---

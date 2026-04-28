@@ -206,7 +206,7 @@ namespace BlockPuzzle.Block
         {
             if (data == null || blockGo == null) return;
 
-            float step = Constants.CellSize + Constants.CellSpacing;
+            float step = BoardManager.Instance.CellSize + BoardManager.Instance.CellSpacing;
             int minX = int.MaxValue, minY = int.MaxValue;
             int maxX = int.MinValue, maxY = int.MinValue;
             foreach (var cell in data.Cells)
@@ -230,7 +230,10 @@ namespace BlockPuzzle.Block
                     (cell.y - minY) * step - centerOffsetY,
                     0f
                 );
-                child.localScale = Vector3.one * Constants.CellSize;
+                child.localScale = Vector3.one;
+                var childSr = child.GetComponent<SpriteRenderer>();
+                if (childSr != null)
+                    childSr.size = new Vector2(BoardManager.Instance.CellSize, BoardManager.Instance.CellSize);
                 childIdx++;
             }
         }
@@ -355,7 +358,7 @@ namespace BlockPuzzle.Block
                 if (cell.y > maxY) maxY = cell.y;
             }
 
-            float step = Constants.CellSize + Constants.CellSpacing;
+            float step = BoardManager.Instance.CellSize + BoardManager.Instance.CellSpacing;
 
             // 包围盒中心偏移（local 空间，未缩放）
             float centerOffsetX = (maxX - minX) * step * 0.5f;
@@ -371,23 +374,25 @@ namespace BlockPuzzle.Block
                 SpriteRenderer sr;
 
                 if (cellPrefab != null)
-                {
-                    cellGo = UnityEngine.Object.Instantiate(cellPrefab, root.transform);
-                    cellGo.name = $"BlockCell_{cell.x}_{cell.y}";
-                    cellGo.transform.localPosition = new Vector3(localX, localY, 0f);
-                    cellGo.transform.localScale = Vector3.one * Constants.CellSize;
-                    sr = cellGo.GetComponent<SpriteRenderer>();
-                    if (sr == null) sr = cellGo.AddComponent<SpriteRenderer>();
-                }
-                else
-                {
-                    cellGo = new GameObject($"BlockCell_{cell.x}_{cell.y}");
-                    cellGo.transform.SetParent(root.transform);
-                    cellGo.transform.localPosition = new Vector3(localX, localY, 0f);
-                    cellGo.transform.localScale = Vector3.one * Constants.CellSize;
-                    sr = cellGo.AddComponent<SpriteRenderer>();
-                    sr.sprite = SpriteUtils.BlockSprite;
-                }
+                    {
+                        cellGo = UnityEngine.Object.Instantiate(cellPrefab, root.transform);
+                        cellGo.name = $"BlockCell_{cell.x}_{cell.y}";
+                        cellGo.transform.localPosition = new Vector3(localX, localY, 0f);
+                        cellGo.transform.localScale = Vector3.one;
+                        sr = cellGo.GetComponent<SpriteRenderer>();
+                        if (sr == null) sr = cellGo.AddComponent<SpriteRenderer>();
+                        sr.size = new Vector2(BoardManager.Instance.CellSize, BoardManager.Instance.CellSize);
+                    }
+                    else
+                    {
+                        cellGo = new GameObject($"BlockCell_{cell.x}_{cell.y}");
+                        cellGo.transform.SetParent(root.transform);
+                        cellGo.transform.localPosition = new Vector3(localX, localY, 0f);
+                        cellGo.transform.localScale = Vector3.one;
+                        sr = cellGo.AddComponent<SpriteRenderer>();
+                        sr.sprite = SpriteUtils.BlockSprite;
+                        sr.size = new Vector2(BoardManager.Instance.CellSize, BoardManager.Instance.CellSize);
+                    }
 
                 sr.color = color;
                 sr.sortingOrder = 10;

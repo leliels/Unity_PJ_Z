@@ -119,6 +119,63 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1001 &466831828
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.97849
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.412
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180424555599275852, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4536125159277530474, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+      propertyPath: m_Name
+      value: '[BoardManager]'
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -378,18 +435,31 @@ MonoBehaviour:
   _gameOverPanelPrefab: {fileID: 0}
   _floatingScorePrefab: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
   _boardCenter: {x: 0, y: -0.1, z: 0}
-  _cellSize: 1.3
+  _cellSize: 1.17
   _cellSpacing: 0.09
   _candidateCenter: {x: 0, y: -8.5, z: 0}
   _candidateSpacing: 3.5
   _candidateScale: 0.35
   _candidateBoardSize: 1
-  _scoreAnchorMin: {x: 0.5, y: 0.92}
-  _scoreAnchorMax: {x: 0.5, y: 0.92}
+  _scoreAnchorMin: {x: 0.53, y: 0.86}
+  _scoreAnchorMax: {x: 0.5, y: 0.9}
   _scoreAnchoredPosition: {x: 0, y: -80}
-  _scoreDigitWidth: 50
-  _scoreDigitHeight: 70
+  _scoreDigitWidth: 32
+  _scoreDigitHeight: 56
   _scoreAlignment: 1
+  _highScoreAnchorMin: {x: 0.54, y: 0.835}
+  _highScoreAnchorMax: {x: 0.5, y: 0.98}
+  _highScoreAnchoredPosition: {x: 0, y: -30}
+  _highScoreDigitWidth: 44
+  _highScoreDigitHeight: 72
+  _highScoreAlignment: 1
+  _highScoreIconSprite: {fileID: 8396283326989279167, guid: b5bd1abcf7a21204dac6f8083910d2f9, type: 3}
+  _highScoreIconSize: {x: 72, y: 64}
+  _highScoreIconOffsetX: -118.9
+  _highScoreIconOffsetY: 5.1
+  _scoreAreaBgSprite: {fileID: -7349663323579243699, guid: f2f0563dd78c4c246a66bfaca990048a, type: 3}
+  _scoreAreaBgSize: {x: 411, y: 240}
+  _scoreAreaBgPosition: {x: 0, y: -140}
   _scoreFormat: "\u5206\u6570: {0}"
   _finalScoreFormat: "\u6700\u7EC8\u5F97\u5206\n{0}"
   _restartButtonPrefab: {fileID: 5453980460094230541, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
@@ -823,11 +893,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 907908314359397628, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 100
+      value: 160
       objectReference: {fileID: 0}
     - target: {fileID: 907908314359397628, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 100
+      value: 160
       objectReference: {fileID: 0}
     - target: {fileID: 907908314359397628, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
       propertyPath: m_LocalPosition.x
@@ -881,10 +951,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: HudRestartButton
       objectReference: {fileID: 0}
-    - target: {fileID: 5453980460094230541, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -903,3 +969,4 @@ SceneRoots:
   - {fileID: 1594104216184314268}
   - {fileID: 3920588535106856054}
   - {fileID: 1488757488257177140}
+  - {fileID: 466831828}

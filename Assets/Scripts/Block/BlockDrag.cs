@@ -57,7 +57,7 @@ namespace BlockPuzzle.Block
                 if (cell.y > maxY) maxY = cell.y;
             }
 
-            float step = Constants.CellSize + Constants.CellSpacing;
+            float step = BoardManager.Instance.CellSize + BoardManager.Instance.CellSpacing;
             float offsetX = -(maxX - minX) * step * 0.5f;
             float offsetY = -(maxY - minY) * step * 0.5f;
             return new Vector3(offsetX, offsetY, 0f);

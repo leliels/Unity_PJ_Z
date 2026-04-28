@@ -118,6 +118,8 @@ namespace BlockPuzzle.Core
         private void HandleGameOver()
         {
             SetState(GameState.GameOver);
+            // 游戏结束时尝试更新最高分
+            ScoreManager.Instance.TryUpdateHighScore();
         }
 
         protected override void OnDestroy()

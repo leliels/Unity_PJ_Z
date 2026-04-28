@@ -50,7 +50,7 @@ namespace BlockPuzzle.Core
         [SerializeField] private Vector3 _boardCenter = new Vector3(0f, 1.1f, 0f);
 
         [Tooltip("每个格子的世界单位大小")]
-        [SerializeField] private float _cellSize = 1.18f;
+        [SerializeField] private float _cellSize = 1.0f;
 
         [Tooltip("格子之间的间距")]
         [SerializeField] private float _cellSpacing = 0.08f;
@@ -77,6 +77,46 @@ namespace BlockPuzzle.Core
         [SerializeField] private float _scoreDigitHeight = 70f;
         [SerializeField] private NumberImageDisplay.Alignment _scoreAlignment = NumberImageDisplay.Alignment.Center;
 
+        // ==================== 最高分显示布局配置 ====================
+        [Header("最高分显示布局")]
+        [Tooltip("最高分锚点最小值")]
+        [SerializeField] private Vector2 _highScoreAnchorMin = new Vector2(0.5f, 0.98f);
+        [Tooltip("最高分锚点最大值")]
+        [SerializeField] private Vector2 _highScoreAnchorMax = new Vector2(0.5f, 0.98f);
+        [Tooltip("最高分位置偏移")]
+        [SerializeField] private Vector2 _highScoreAnchoredPosition = new Vector2(0f, -30f);
+        [Tooltip("最高分数字宽度")]
+        [SerializeField] private float _highScoreDigitWidth = 35f;
+        [Tooltip("最高分数字高度")]
+        [SerializeField] private float _highScoreDigitHeight = 50f;
+        [Tooltip("最高分对齐方式")]
+        [SerializeField] private NumberImageDisplay.Alignment _highScoreAlignment = NumberImageDisplay.Alignment.Center;
+
+        // ==================== 最高分图标配置 ====================
+        [Header("最高分图标（装饰）")]
+        [Tooltip("最高分图标 Sprite（icon_HG.png）。为空时自动从 Assets/Art/拆分资源/ 加载。")]
+        [SerializeField] private Sprite _highScoreIconSprite;
+
+        [Tooltip("图标大小（宽 x 高，像素单位）")]
+        [SerializeField] private Vector2 _highScoreIconSize = new Vector2(45f, 45f);
+
+        [Tooltip("图标相对数字左侧的 X 偏移量（像素单位，负值=更靠左）")]
+        [SerializeField] private float _highScoreIconOffsetX = -10f;
+
+        [Tooltip("图标相对数字垂直居中的 Y 偏移量（像素单位，正值=上移，负值=下移）")]
+        [SerializeField] private float _highScoreIconOffsetY = 0f;
+
+        // ==================== 分数区域底板配置 ====================
+        [Header("分数区域底板（装饰）")]
+        [Tooltip("底板 Sprite（DB_ZGF.png）。为空时自动从 Assets/Art/拆分资源/ 加载。")]
+        [SerializeField] private Sprite _scoreAreaBgSprite;
+
+        [Tooltip("底板大小（宽 x 高，像素单位）")]
+        [SerializeField] private Vector2 _scoreAreaBgSize = new Vector2(400f, 180f);
+
+        [Tooltip("底板位置（anchoredPosition，像素单位）")]
+        [SerializeField] private Vector2 _scoreAreaBgPosition = new Vector2(0f, -50f);
+
         // ==================== 显示格式配置 ====================
         [Header("分数显示格式")]
         [Tooltip("游戏中分数格式。{0}=分数数字。例：\"Score: {0}\"、\"分数\\n{0}\"、\"{0}\"")]
@@ -89,6 +129,12 @@ namespace BlockPuzzle.Core
         [Header("HUD 按钮 Prefab（可选）")]
         [Tooltip("重新开始按钮 Prefab（需含 Image + Button 组件）。为空时不显示。")]
         [SerializeField] private GameObject _restartButtonPrefab;
+
+        /// <summary>分数区域底板缓存引用（供 OnValidate 热更新用）</summary>
+        private GameObject _scoreAreaBgGo;
+
+        /// <summary>最高分图标缓存引用（供 OnValidate 热更新用）</summary>
+        private GameObject _highScoreIconGo;
 
         private void Awake()
         {
@@ -236,6 +282,9 @@ namespace BlockPuzzle.Core
                 esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
             }
 
+            // --- 分数区域装饰底板 ---
+            _scoreAreaBgGo = CreateScoreAreaBackground(canvasGo.transform);
+
             // --- 分数显示 ---
             GameObject scoreDisplayGo;
             if (_scoreDisplayPrefab != null && _scoreDisplayPrefab.GetComponent<NumberImageDisplay>() != null)
@@ -264,6 +313,16 @@ namespace BlockPuzzle.Core
             // 自动加载数字精灵（如果 Prefab 没有配置）
             EnsureDigitSprites(scoreDisplayGo);
 
+            // --- 最高分显示 ---
+            GameObject highScoreDisplayGo = CreateNumberImageDisplay(canvasGo.transform,
+                _highScoreAnchorMin, _highScoreAnchorMax, _highScoreAnchoredPosition,
+                _highScoreDigitWidth, _highScoreDigitHeight, _highScoreAlignment);
+            highScoreDisplayGo.name = "HighScoreDisplay";
+            EnsureDigitSprites(highScoreDisplayGo);
+
+            // --- 最高分图标（在数值前面） ---
+            _highScoreIconGo = CreateHighScoreIcon(highScoreDisplayGo.transform);
+
             // --- 游戏结束面板 ---
             GameObject gameOverPanel;
             if (_gameOverPanelPrefab != null)
@@ -282,6 +341,7 @@ namespace BlockPuzzle.Core
 
             // 通过反射设置私有字段（因为是 SerializeField）
             SetPrivateField(gameUI, "_scoreDisplay", scoreDisplayGo.GetComponent<NumberImageDisplay>());
+            SetPrivateField(gameUI, "_highScoreDisplay", highScoreDisplayGo.GetComponent<NumberImageDisplay>());
             SetPrivateField(gameUI, "_scoreFormat", _scoreFormat);
             SetPrivateField(gameUI, "_gameOverPanel", gameOverPanel);
             SetPrivateField(gameUI, "_finalScoreText", gameOverPanel.transform.Find("FinalScoreText")?.GetComponent<Text>());
@@ -340,6 +400,79 @@ namespace BlockPuzzle.Core
             display.TextAlignment = alignment;
 
             return go;
+        }
+
+        /// <summary>创建分数区域装饰底板（DB_ZGF.png）</summary>
+        private GameObject CreateScoreAreaBackground(Transform parent)
+        {
+            var sprite = _scoreAreaBgSprite ?? LoadScoreAreaBgSprite();
+            if (sprite == null) return null;
+
+            var go = new GameObject("ScoreAreaBackground", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.sizeDelta = _scoreAreaBgSize;
+            rect.anchoredPosition = _scoreAreaBgPosition;
+
+            var img = go.GetComponent<Image>();
+            img.sprite = sprite;
+            img.type = Image.Type.Sliced; // 支持九宫格拉伸（美术可自行设置）
+            img.raycastTarget = false;    // 装饰用，不阻挡点击
+
+            return go;
+        }
+
+        /// <summary>加载分数区域底板 Sprite（Assets/Art/拆分资源/DB_ZGF.png）</summary>
+        private static Sprite LoadScoreAreaBgSprite()
+        {
+            // 优先 Resources
+            var sprite = Resources.Load<Sprite>("Art/拆分资源/DB_ZGF");
+#if UNITY_EDITOR
+            // Editor 下 fallback 到 AssetDatabase
+            if (sprite == null)
+                sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/拆分资源/DB_ZGF.png");
+#endif
+            return sprite;
+        }
+
+        /// <summary>创建最高分装饰图标（icon_HG.png），作为 HighScoreDisplay 的子对象</summary>
+        private GameObject CreateHighScoreIcon(Transform parent)
+        {
+            var sprite = _highScoreIconSprite ?? LoadHighScoreIconSprite();
+            if (sprite == null) return null;
+
+            var go = new GameObject("HighScoreIcon", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f); // 右锚点，便于用 offset 定位到数字左侧
+            rect.sizeDelta = _highScoreIconSize;
+            // 位置：在数字左侧，offsetX/offsetY 控制位置
+            rect.anchoredPosition = new Vector2(_highScoreIconOffsetX, _highScoreIconOffsetY);
+
+            var img = go.GetComponent<Image>();
+            img.sprite = sprite;
+            img.preserveAspect = true;
+            img.raycastTarget = false; // 装饰用
+
+            return go;
+        }
+
+        /// <summary>加载最高分图标 Sprite（Assets/Art/拆分资源/icon_HG.png）</summary>
+        private static Sprite LoadHighScoreIconSprite()
+        {
+            var sprite = Resources.Load<Sprite>("Art/拆分资源/icon_HG");
+#if UNITY_EDITOR
+            if (sprite == null)
+                sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/拆分资源/icon_HG.png");
+#endif
+            return sprite;
         }
 
         /// <summary>
@@ -501,6 +634,9 @@ namespace BlockPuzzle.Core
 
                 // 刷新分数显示布局参数
                 RefreshScoreDisplayLayout();
+                RefreshHighScoreDisplayLayout();
+                RefreshScoreAreaBgLayout();
+                RefreshHighScoreIconLayout();
             };
         }
 
@@ -522,6 +658,58 @@ namespace BlockPuzzle.Core
             rect.anchorMin = _scoreAnchorMin;
             rect.anchorMax = _scoreAnchorMax;
             rect.anchoredPosition = _scoreAnchoredPosition;
+        }
+
+        /// <summary>运行时热更新最高分显示的布局参数</summary>
+        private void RefreshHighScoreDisplayLayout()
+        {
+            var gameUI = FindFirstObjectByType<GameUI>();
+            if (gameUI == null) return;
+            var field = typeof(GameUI).GetField("_highScoreDisplay",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var display = field?.GetValue(gameUI) as NumberImageDisplay;
+            if (display == null) return;
+
+            display.DigitWidth = _highScoreDigitWidth;
+            display.DigitHeight = _highScoreDigitHeight;
+            display.TextAlignment = _highScoreAlignment;
+            var rect = display.GetComponent<RectTransform>();
+            rect.anchorMin = _highScoreAnchorMin;
+            rect.anchorMax = _highScoreAnchorMax;
+            rect.anchoredPosition = _highScoreAnchoredPosition;
+        }
+
+        /// <summary>运行时热更新分数区域底板的布局参数</summary>
+        private void RefreshScoreAreaBgLayout()
+        {
+            if (_scoreAreaBgGo == null) return;
+            var rect = _scoreAreaBgGo.GetComponent<RectTransform>();
+            if (rect == null) return;
+            rect.sizeDelta = _scoreAreaBgSize;
+            rect.anchoredPosition = _scoreAreaBgPosition;
+
+            // 如果 Inspector 手动换了 Sprite 也同步更新
+            if (_scoreAreaBgSprite != null)
+            {
+                var img = _scoreAreaBgGo.GetComponent<Image>();
+                if (img != null) img.sprite = _scoreAreaBgSprite;
+            }
+        }
+
+        /// <summary>运行时热更新最高分图标的布局参数</summary>
+        private void RefreshHighScoreIconLayout()
+        {
+            if (_highScoreIconGo == null) return;
+            var rect = _highScoreIconGo.GetComponent<RectTransform>();
+            if (rect == null) return;
+            rect.sizeDelta = _highScoreIconSize;
+            rect.anchoredPosition = new Vector2(_highScoreIconOffsetX, _highScoreIconOffsetY);
+
+            if (_highScoreIconSprite != null)
+            {
+                var img = _highScoreIconGo.GetComponent<Image>();
+                if (img != null) img.sprite = _highScoreIconSprite;
+            }
         }
 #endif
     }

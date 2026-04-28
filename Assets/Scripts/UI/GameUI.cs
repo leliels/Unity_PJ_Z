@@ -6,12 +6,15 @@ using BlockPuzzle.Score;
 namespace BlockPuzzle.UI
 {
     /// <summary>
-    /// 游戏 HUD：分数显示 + 游戏结束面板
+    /// 游戏 HUD：分数显示 + 最高分显示 + 游戏结束面板
     /// </summary>
     public class GameUI : MonoBehaviour
     {
         [Header("HUD")]
         [SerializeField] private NumberImageDisplay _scoreDisplay;
+
+        [Header("最高分")]
+        [SerializeField] private NumberImageDisplay _highScoreDisplay;
 
         [Header("Game Over Panel")]
         [SerializeField] private GameObject _gameOverPanel;
@@ -22,7 +25,12 @@ namespace BlockPuzzle.UI
         {
             // 注册事件
             if (ScoreManager.Instance != null)
+            {
                 ScoreManager.Instance.OnScoreChanged += UpdateScoreDisplay;
+                ScoreManager.Instance.OnHighScoreChanged += UpdateHighScoreDisplay;
+                // 初始显示最高分
+                UpdateHighScoreDisplay(ScoreManager.Instance.HighScore);
+            }
 
             if (GameManager.Instance != null)
                 GameManager.Instance.OnGameStateChanged += HandleGameStateChanged;
@@ -41,10 +49,19 @@ namespace BlockPuzzle.UI
         private void OnDestroy()
         {
             if (ScoreManager.Instance != null)
+            {
                 ScoreManager.Instance.OnScoreChanged -= UpdateScoreDisplay;
+                ScoreManager.Instance.OnHighScoreChanged -= UpdateHighScoreDisplay;
+            }
 
             if (GameManager.Instance != null)
                 GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
+        }
+
+        private void UpdateHighScoreDisplay(int highScore)
+        {
+            if (_highScoreDisplay != null)
+                _highScoreDisplay.SetNumber(highScore);
         }
 
         private void UpdateScoreDisplay(int score)
