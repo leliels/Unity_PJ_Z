@@ -21,6 +21,12 @@ namespace BlockPuzzle.Block
         [Tooltip("候选槽位黑色底板 Sprite（DB_01.png）。无 Slot Prefab 时的 fallback。")]
         [SerializeField] private Sprite _candidateBoardSprite;
 
+        [Tooltip("底板大小（世界单位）。值越大，底板越大。默认 4.5，建议范围 3.0~6.0。")]
+        [SerializeField] private float _candidateBoardSize = 4.5f;
+
+        /// <summary>设置候选区底板大小</summary>
+        public void SetCandidateBoardSize(float size) { _candidateBoardSize = size; }
+
         [Tooltip("候选槽位 Prefab（可选）。Prefab 内名为 'BlockAnchor' 的子对象将作为方块挂载点。")]
         [SerializeField] private GameObject _candidateSlotPrefab;
 
@@ -38,8 +44,12 @@ namespace BlockPuzzle.Block
 
         // 候选方块数据（null 表示已被使用）
         private BlockData[] _candidateData;
-        // 候选槽位 GameObject（Slot 容器）
+        // 候选槽位 GameObject（Slot 容器 = 可拖拽的方块）
         private GameObject[] _candidateObjects;
+        // 底板 GameObject（独立于 Slot，固定不动的背景板）
+        private GameObject[] _candidateBoards;
+        // 底板根容器（所有底板的统一父对象）
+        private Transform _boardsContainer;
         // 使用计数
         private int _usedCount;
 
@@ -77,26 +87,41 @@ namespace BlockPuzzle.Block
         {
             _candidateData = new BlockData[Constants.CandidateCount];
             _candidateObjects = new GameObject[Constants.CandidateCount];
+
+            // 底板数组：保留已有底板引用（重新开始时复用），首次初始化则新建数组
+            if (_candidateBoards == null)
+                _candidateBoards = new GameObject[Constants.CandidateCount];
+
             _usedCount = 0;
 
+            EnsureBoardsContainer();
             SpawnCandidates();
         }
 
+        /// <summary>确保底板容器存在（懒创建，仅一次）</summary>
+        private void EnsureBoardsContainer()
+        {
+            if (_boardsContainer != null && _boardsContainer.gameObject != null) return;
+            var go = GameObject.Find("[CandidateBoards]");
+            if (go == null)
+                go = new GameObject("[CandidateBoards]");
+            _boardsContainer = go.transform;
+        }
+
         /// <summary>
-        /// 清除所有候选方块（重新开始用）
+        /// 清除所有候选方块（重新开始用）。
+        /// 注意：底板(Board)不在此清除，底板一旦创建就持续存在。
         /// </summary>
         public void ClearAll()
         {
             if (_candidateObjects != null)
             {
                 for (int i = 0; i < _candidateObjects.Length; i++)
-                {
-                    if (_candidateObjects[i] != null)
-                        Destroy(_candidateObjects[i]);
-                }
+                    if (_candidateObjects[i] != null) Destroy(_candidateObjects[i]);
             }
             _candidateData = null;
             _candidateObjects = null;
+            // 注意：_candidateBoards 和 _boardsContainer 不清空，保持到底板存在
             _usedCount = 0;
         }
 
@@ -113,6 +138,7 @@ namespace BlockPuzzle.Block
                 Destroy(_candidateObjects[index]);
                 _candidateObjects[index] = null;
             }
+            // 底板保持不变，不随单个方块使用而销毁
 
             _usedCount++;
 
@@ -141,19 +167,21 @@ namespace BlockPuzzle.Block
 
             for (int i = 0; i < Constants.CandidateCount; i++)
             {
-                var slot = _candidateObjects[i];
-                if (slot == null) continue;
-
                 Vector3 newPos = new Vector3(startX + i * Constants.CandidateSpacing, Constants.CandidateCenter.y, 0f);
-                slot.transform.position = newPos;
-                slot.transform.localScale = Vector3.one * Constants.CandidateScale;
 
-                // 更新底板大小
-                var boardObj = slot.transform.Find("Board");
-                if (boardObj != null)
+                // 更新 Slot（可拖拽的方块）位置和缩放
+                var slot = _candidateObjects[i];
+                if (slot != null)
                 {
-                    float boardSize = 3.8f * Constants.CellSize;
-                    boardObj.localScale = new Vector3(boardSize, boardSize, 1f);
+                    slot.transform.position = newPos;
+                    slot.transform.localScale = Vector3.one * Constants.CandidateScale;
+                }
+
+                // 更新底板位置和大小（底板独立于 Slot，固定在背景上）
+                if (_candidateBoards != null && _candidateBoards[i] != null)
+                {
+                    _candidateBoards[i].transform.position = newPos;
+                    _candidateBoards[i].transform.localScale = new Vector3(_candidateBoardSize, _candidateBoardSize, 1f);
                 }
 
                 // 更新内部方块子格子的间距和大小
@@ -243,22 +271,30 @@ namespace BlockPuzzle.Block
                 }
                 else
                 {
-                    // === Fallback 模式：代码创建 Slot + 可选 Sprite 底板 ===
+                    // === Fallback 模式：代码创建 Slot（仅方块），底板独立 ===
                     slotGo = new GameObject($"CandidateSlot_{i}");
                     slotGo.transform.position = pos;
                     slotGo.transform.localScale = Vector3.one * Constants.CandidateScale;
 
+                    // 底板创建在固定容器中（不随 Slot 拖拽移动）
+                    // 已有底板则复用（刷新时底板不变），仅更新位置和大小
                     if (_candidateBoardSprite != null)
                     {
-                        var boardGo = new GameObject("Board");
-                        boardGo.transform.SetParent(slotGo.transform, false);
-                        boardGo.transform.localPosition = Vector3.zero;
+                        var boardGo = _candidateBoards[i];
+                        if (boardGo == null)
+                        {
+                            boardGo = new GameObject($"Board_{i}");
+                            boardGo.transform.SetParent(_boardsContainer, false);
 
-                        var sr = boardGo.AddComponent<SpriteRenderer>();
-                        sr.sprite = _candidateBoardSprite;
-                        sr.sortingOrder = 4;
-                        float boardSize = 3.8f * Constants.CellSize;
-                        boardGo.transform.localScale = new Vector3(boardSize, boardSize, 1f);
+                            var sr = boardGo.AddComponent<SpriteRenderer>();
+                            sr.sprite = _candidateBoardSprite;
+                            sr.sortingOrder = 4;
+
+                            _candidateBoards[i] = boardGo;
+                        }
+                        // 始终同步位置和大小（运行时调整参数时也需更新）
+                        boardGo.transform.position = pos;
+                        boardGo.transform.localScale = new Vector3(_candidateBoardSize, _candidateBoardSize, 1f);
                     }
 
                     blockAnchor = slotGo.transform;

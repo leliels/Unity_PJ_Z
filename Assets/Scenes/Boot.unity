@@ -372,8 +372,9 @@ MonoBehaviour:
   _cellPrefab: {fileID: 4684049486210500372, guid: 6d719c266e4280e4d9407a82622d01cd, type: 3}
   _previewPrefab: {fileID: 3338880705683207701, guid: 365cd0dba80e38e49bbb28076ba34b37, type: 3}
   _blockCellPrefab: {fileID: 5453268057963300775, guid: f4bc83c121d1d9a4c9ef8a71061407ca, type: 3}
-  _candidateBoardSprite: {fileID: 0}
-  _scoreDisplayPrefab: {fileID: 7483291058124688001, guid: 7074780b27ecf7c45871cb599ea82f54, type: 3}
+  _candidateBoardSprite: {fileID: 6566661897477329138, guid: 130ee34bcb04a52409a85d3a07952716, type: 3}
+  _candidateSlotPrefab: {fileID: 0}
+  _scoreDisplayPrefab: {fileID: 0}
   _gameOverPanelPrefab: {fileID: 0}
   _floatingScorePrefab: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
   _boardCenter: {x: 0, y: -0.1, z: 0}
@@ -381,7 +382,8 @@ MonoBehaviour:
   _cellSpacing: 0.09
   _candidateCenter: {x: 0, y: -8.5, z: 0}
   _candidateSpacing: 3.5
-  _candidateScale: 0.6
+  _candidateScale: 0.35
+  _candidateBoardSize: 1
   _scoreAnchorMin: {x: 0.5, y: 0.92}
   _scoreAnchorMax: {x: 0.5, y: 0.92}
   _scoreAnchoredPosition: {x: 0, y: -80}
@@ -558,10 +560,6 @@ PrefabInstance:
     - target: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
       propertyPath: m_Name
       value: FloatingScore
-      objectReference: {fileID: 0}
-    - target: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
-      propertyPath: m_IsActive
-      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

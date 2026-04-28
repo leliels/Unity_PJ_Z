@@ -65,6 +65,9 @@ namespace BlockPuzzle.Core
         [Tooltip("候选方块的缩放比例（相对于棋盘格子大小）")]
         [SerializeField] private float _candidateScale = 0.55f;
 
+        [Tooltip("候选区背景底板大小（世界单位）。值越大，底板越大。默认 4.5，建议范围 3.0~6.0。")]
+        [SerializeField] private float _candidateBoardSize = 4.5f;
+
         // ==================== 分数显示布局配置 ====================
         [Header("分数显示布局")]
         [SerializeField] private Vector2 _scoreAnchorMin = new Vector2(0.5f, 0.92f);
@@ -189,6 +192,7 @@ namespace BlockPuzzle.Core
             {
                 BlockSpawner.Instance.SetBlockCellPrefab(_blockCellPrefab);
                 BlockSpawner.Instance.SetCandidateBoardSprite(_candidateBoardSprite);
+                BlockSpawner.Instance.SetCandidateBoardSize(_candidateBoardSize);
                 BlockSpawner.Instance.SetCandidateSlotPrefab(_candidateSlotPrefab);
             }
 
@@ -477,9 +481,12 @@ namespace BlockPuzzle.Core
                 if (BoardManager.Instance != null)
                     BoardManager.Instance.RelayoutBoard();
 
-                // 刷新候选区布局
+                // 刷新候选区布局（含底板大小）
                 if (BlockSpawner.Instance != null)
+                {
+                    BlockSpawner.Instance.SetCandidateBoardSize(_candidateBoardSize);
                     BlockSpawner.Instance.RelayoutCandidates();
+                }
 
                 // 刷新分数格式显示
                 var gameUI = FindFirstObjectByType<GameUI>();
