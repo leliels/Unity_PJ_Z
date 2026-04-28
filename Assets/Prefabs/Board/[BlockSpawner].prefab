@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6004568209598056796
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2825645501013320896}
+  - component: {fileID: 5341404197207306784}
+  m_Layer: 0
+  m_Name: '[BlockSpawner]'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2825645501013320896
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6004568209598056796}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5341404197207306784
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6004568209598056796}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a342ce0ae8c32d46916a7b01a958e8a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BlockPuzzle.Block.BlockSpawner
+  _blockCellPrefab: {fileID: 5453268057963300775, guid: f4bc83c121d1d9a4c9ef8a71061407ca, type: 3}
+  _candidateBoardPrefab: {fileID: 7262116518564412698, guid: 3afba7c4b0ddd2d499fff4376b75cbaa, type: 3}
+  _candidateBoardSprite: {fileID: 6566661897477329138, guid: 130ee34bcb04a52409a85d3a07952716, type: 3}
+  _candidateBoardSize: 1
+  _candidateSlotPrefab: {fileID: 1768493203503172699, guid: f0b9516f79b51e74dbb8295bf6e1c175, type: 3}
+  _looseCandidateDrag: 1

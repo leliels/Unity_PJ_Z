@@ -13,13 +13,13 @@ namespace BlockPuzzle.Utils
         public const int BoardCols = 8;
 
         // --- 棋盘视觉（可在 Inspector 调整） ---
-        public static float CellSize = 1.0f;              // 每个格子的世界单位大小
-        public static float CellSpacing = 0.08f;       // 格子间距
+        public static float CellSize = 1.17f;              // 每个格子的世界单位大小
+        public static float CellSpacing = 0.09f;       // 格子间距
 
         // --- 候选方块（可在 Inspector 调整） ---
         public const int CandidateCount = 3;            // 候选区方块数量
-        public static float CandidateScale = 0.55f;     // 候选方块缩放比例
-        public static float CandidateSpacing = 3.6f;    // 候选方块间距
+        public static float CandidateScale = 0.35f;     // 候选方块缩放比例
+        public static float CandidateSpacing = 3.5f;    // 候选方块间距
 
         // --- 计分规则（2026-04-28 排分制） ---
         public const int ScorePerCell = 1;               // 放置每格分数
@@ -31,8 +31,8 @@ namespace BlockPuzzle.Utils
         [System.Obsolete("排分制不再使用线性 Combo 系数，请使用 ScoreManager 内部公式", false)] public const float ComboMultiplierStep = 0f;
 
         // --- 布局位置（可在 Inspector 调整） ---
-        public static Vector3 BoardCenter = new Vector3(0f, 1.1f, 0f);
-        public static Vector3 CandidateCenter = new Vector3(0f, -8.2f, 0f);
+        public static Vector3 BoardCenter = new Vector3(0f, -0.1f, 0f);
+        public static Vector3 CandidateCenter = new Vector3(0f, -8.5f, 0f);
 
         // --- 颜色 ---
         public static readonly Color PreviewValidColor = new Color(1f, 1f, 1f, 0.4f);

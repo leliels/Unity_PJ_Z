@@ -450,45 +450,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 643db418a48e82a44860de07f2b7a687, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockPuzzle.Core.SceneBootstrap
-  _cellPrefab: {fileID: 4684049486210500372, guid: 6d719c266e4280e4d9407a82622d01cd, type: 3}
-  _previewPrefab: {fileID: 3338880705683207701, guid: 365cd0dba80e38e49bbb28076ba34b37, type: 3}
-  _blockCellPrefab: {fileID: 5453268057963300775, guid: f4bc83c121d1d9a4c9ef8a71061407ca, type: 3}
-  _candidateBoardSprite: {fileID: 6566661897477329138, guid: 130ee34bcb04a52409a85d3a07952716, type: 3}
-  _candidateSlotPrefab: {fileID: 0}
-  _scoreDisplayPrefab: {fileID: 0}
-  _gameOverPanelPrefab: {fileID: 0}
+  _boardManagerPrefab: {fileID: 4536125159277530474, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
+  _blockSpawnerPrefab: {fileID: 6004568209598056796, guid: 0fd05ebf24eb07b4aa679898c1b43fa7, type: 3}
+  _scoreDisplayPrefab: {fileID: 4542604717784929680, guid: 8a042ea2a1492604c876e0c81bceb498, type: 3}
+  _highScoreDisplayPrefab: {fileID: 6940174106449569296, guid: f4777399f369c944f8113f5f287aa1c4, type: 3}
+  _gameOverPanelPrefab: {fileID: 159103383001983178, guid: 255a689714b34f148adafd680506f4e1, type: 3}
   _floatingScorePrefab: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
-  _boardCenter: {x: 0, y: -0.1, z: 0}
-  _cellSize: 1.17
-  _cellSpacing: 0.09
+  _restartButtonPrefab: {fileID: 5453980460094230541, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
+  _backgroundCanvasPrefab: {fileID: 5934255449006602508, guid: 6292a563e2be5804dae86c7cc433fb01, type: 3}
   _candidateCenter: {x: 0, y: -8.5, z: 0}
   _candidateSpacing: 3.5
   _candidateScale: 0.35
-  _candidateBoardSize: 1
-  _looseCandidateDrag: 1
-  _scoreAnchorMin: {x: 0.53, y: 0.86}
-  _scoreAnchorMax: {x: 0.5, y: 0.9}
-  _scoreAnchoredPosition: {x: 0, y: -80}
-  _scoreDigitWidth: 32
-  _scoreDigitHeight: 56
-  _scoreAlignment: 1
-  _highScoreAnchorMin: {x: 0.54, y: 0.835}
-  _highScoreAnchorMax: {x: 0.5, y: 0.98}
-  _highScoreAnchoredPosition: {x: 0, y: -30}
-  _highScoreDigitWidth: 44
-  _highScoreDigitHeight: 72
-  _highScoreAlignment: 1
-  _highScoreIconSprite: {fileID: 8396283326989279167, guid: b5bd1abcf7a21204dac6f8083910d2f9, type: 3}
-  _highScoreIconSize: {x: 72, y: 64}
-  _highScoreIconOffsetX: -118.9
-  _highScoreIconOffsetY: 5.1
-  _scoreAreaBgSprite: {fileID: -7349663323579243699, guid: f2f0563dd78c4c246a66bfaca990048a, type: 3}
-  _scoreAreaBgSize: {x: 411, y: 240}
-  _scoreAreaBgPosition: {x: 0, y: -140}
-  _scoreFormat: "\u5206\u6570: {0}"
-  _finalScoreFormat: "\u6700\u7EC8\u5F97\u5206\n{0}"
-  _boardManagerPrefab: {fileID: 4536125159277530474, guid: 5cadda19cd2459542a7d1a3f80031cf6, type: 3}
-  _restartButtonPrefab: {fileID: 5453980460094230541, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
 --- !u!4 &1498382795
 Transform:
   m_ObjectHideFlags: 0

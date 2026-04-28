@@ -18,10 +18,14 @@ namespace BlockPuzzle.Block
         [SerializeField] private GameObject _blockCellPrefab;
 
         [Header("候选区底板")]
-        [Tooltip("候选槽位黑色底板 Sprite（DB_01.png）。无 Slot Prefab 时的 fallback。")]
+        [Tooltip("候选区底板 Prefab（每个候选位实例化一个，固定不动）。\n"
+               + "为空时用底板 Sprite fallback 创建。")]
+        [SerializeField] private GameObject _candidateBoardPrefab;
+
+        [Tooltip("候选槽位黑色底板 Sprite（DB_01.png）。无底板 Prefab 时的 fallback。")]
         [SerializeField] private Sprite _candidateBoardSprite;
 
-        [Tooltip("底板大小（世界单位）。值越大，底板越大。默认 4.5，建议范围 3.0~6.0。")]
+        [Tooltip("底板大小（世界单位）。仅在 Sprite fallback 模式下生效。")]
         [SerializeField] private float _candidateBoardSize = 4.5f;
 
         /// <summary>设置候选区底板大小</summary>
@@ -30,17 +34,11 @@ namespace BlockPuzzle.Block
         [Tooltip("候选槽位 Prefab（可选）。Prefab 内名为 'BlockAnchor' 的子对象将作为方块挂载点。")]
         [SerializeField] private GameObject _candidateSlotPrefab;
 
-        /// <summary>外部设置 Block Cell Prefab（供 SceneBootstrap 代码注入）</summary>
-        public void SetBlockCellPrefab(GameObject prefab) { if (_blockCellPrefab == null) _blockCellPrefab = prefab; }
+        // BlockCell/CandidateBoard/CandidateSlot Prefab 由 BlockSpawner 自身 Inspector 配置，不再需要外部注入
 
-        /// <summary>设置候选区底板 Sprite</summary>
-        public void SetCandidateBoardSprite(Sprite sprite) { if (_candidateBoardSprite == null) _candidateBoardSprite = sprite; }
-
-        /// <summary>设置候选槽位 Prefab</summary>
-        public void SetCandidateSlotPrefab(GameObject prefab) { if (_candidateSlotPrefab == null) _candidateSlotPrefab = prefab; }
-
-        /// <summary>宽松候选区拖拽模式（由 SceneBootstrap 注入）</summary>
-        private bool _looseCandidateDrag;
+        [Header("拖拽配置")]
+        [Tooltip("宽松候选区拖拽：手指在候选区范围内任意位置即可拖动最近的方块")]
+        [SerializeField] private bool _looseCandidateDrag = true;
 
         /// <summary>设置宽松候选区拖拽模式</summary>
         public void SetLooseCandidateDrag(bool enabled) { _looseCandidateDrag = enabled; }
@@ -211,11 +209,12 @@ namespace BlockPuzzle.Block
                     slot.transform.localScale = Vector3.one * Constants.CandidateScale;
                 }
 
-                // 更新底板位置和大小（底板独立于 Slot，固定在背景上）
+                // 更新底板位置（Prefab 模式不改 scale）
                 if (_candidateBoards != null && _candidateBoards[i] != null)
                 {
                     _candidateBoards[i].transform.position = newPos;
-                    _candidateBoards[i].transform.localScale = new Vector3(_candidateBoardSize, _candidateBoardSize, 1f);
+                    if (_candidateBoardPrefab == null)
+                        _candidateBoards[i].transform.localScale = new Vector3(_candidateBoardSize, _candidateBoardSize, 1f);
                 }
 
                 // 更新内部方块子格子的间距和大小
@@ -295,46 +294,52 @@ namespace BlockPuzzle.Block
 
                 if (_candidateSlotPrefab != null)
                 {
-                    // === Prefab 模式：美术可在 Prefab 内自由调整底板布局 ===
+                    // === Prefab 模式 ===
                     slotGo = Instantiate(_candidateSlotPrefab);
                     slotGo.SetActive(true);
                     slotGo.name = $"CandidateSlot_{i}";
                     slotGo.transform.position = pos;
                     slotGo.transform.localScale = Vector3.one * Constants.CandidateScale;
 
-                    // 查找方块挂载点：优先找名为 "BlockAnchor" 的子对象，找不到就用根节点
                     var anchorTf = slotGo.transform.Find("BlockAnchor");
                     blockAnchor = anchorTf != null ? anchorTf : slotGo.transform;
                 }
                 else
                 {
-                    // === Fallback 模式：代码创建 Slot（仅方块），底板独立 ===
+                    // === Fallback 模式 ===
                     slotGo = new GameObject($"CandidateSlot_{i}");
                     slotGo.transform.position = pos;
                     slotGo.transform.localScale = Vector3.one * Constants.CandidateScale;
-
-                    // 底板创建在固定容器中（不随 Slot 拖拽移动）
-                    // 已有底板则复用（刷新时底板不变），仅更新位置和大小
-                    if (_candidateBoardSprite != null)
-                    {
-                        var boardGo = _candidateBoards[i];
-                        if (boardGo == null)
-                        {
-                            boardGo = new GameObject($"Board_{i}");
-                            boardGo.transform.SetParent(_boardsContainer, false);
-
-                            var sr = boardGo.AddComponent<SpriteRenderer>();
-                            sr.sprite = _candidateBoardSprite;
-                            sr.sortingOrder = 4;
-
-                            _candidateBoards[i] = boardGo;
-                        }
-                        // 始终同步位置和大小（运行时调整参数时也需更新）
-                        boardGo.transform.position = pos;
-                        boardGo.transform.localScale = new Vector3(_candidateBoardSize, _candidateBoardSize, 1f);
-                    }
-
                     blockAnchor = slotGo.transform;
+                }
+
+                // --- 底板：始终独立于 Slot，固定在 [CandidateBoards] 容器中 ---
+                if (_candidateBoards[i] == null)
+                {
+                    if (_candidateBoardPrefab != null)
+                    {
+                        // Prefab 模式：美术可在 Prefab 里自由调整底板外观
+                        var boardGo = Instantiate(_candidateBoardPrefab, _boardsContainer);
+                        boardGo.name = $"Board_{i}";
+                        _candidateBoards[i] = boardGo;
+                    }
+                    else if (_candidateBoardSprite != null)
+                    {
+                        // Sprite fallback 模式
+                        var boardGo = new GameObject($"Board_{i}");
+                        boardGo.transform.SetParent(_boardsContainer, false);
+                        var sr = boardGo.AddComponent<SpriteRenderer>();
+                        sr.sprite = _candidateBoardSprite;
+                        sr.sortingOrder = 4;
+                        _candidateBoards[i] = boardGo;
+                    }
+                }
+                // 同步位置（Prefab 模式不改 scale，由 Prefab 自身控制；fallback 模式用 _candidateBoardSize）
+                if (_candidateBoards[i] != null)
+                {
+                    _candidateBoards[i].transform.position = pos;
+                    if (_candidateBoardPrefab == null)
+                        _candidateBoards[i].transform.localScale = new Vector3(_candidateBoardSize, _candidateBoardSize, 1f);
                 }
 
                 // --- 方块视觉 ---

@@ -56,10 +56,7 @@ namespace BlockPuzzle.Board
         private Transform _boardContainer;
         private Transform _boardScaleRoot;              // 整体缩放根节点
 
-        /// <summary>外部设置 Cell Prefab（供 SceneBootstrap 代码注入）</summary>
-        public void SetCellPrefab(GameObject prefab) { if (_cellPrefab == null) _cellPrefab = prefab; }
-        /// <summary>外部设置 Preview Prefab</summary>
-        public void SetPreviewPrefab(GameObject prefab) { if (_previewPrefab == null) _previewPrefab = prefab; }
+        // Cell/Preview Prefab 由 BoardManager Prefab 自身 Inspector 配置，不再需要外部注入
 
         // --- 棋盘的世界坐标起点（左下角） ---
         private Vector3 _boardOrigin;
