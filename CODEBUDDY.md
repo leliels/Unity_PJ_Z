@@ -13,7 +13,7 @@
 |--------|------|------|
 | M0 项目准备 | ✅ | 文档、目录、美术效果图 |
 | M1 核心原型 | ✅ | 棋盘+方块+拖拽+消除+计分，已验收 |
-| M2 数值体验+换皮 | 🔵 收尾中 | 任务1-4已完成，任务5 Prefab化已完成大部分（13个Prefab） |
+| M2 数值体验+换皮 | 🔵 收尾中 | 任务1-5已完成大部分，方块形状配置工具已接入，待运行验证 |
 | M3 完整玩法 | ⬜ | UI流程+游戏模式+存档+音效 |
 | M4 内容填充 | ⬜ | 特效+音效+冒险模式机制 |
 | M5 打磨上线 | ⬜ | Bug修复+适配+上架 |
@@ -27,7 +27,8 @@
 ## 关键技术决策
 
 - 竖屏 1080×1920 | 8×8 棋盘 | 3 候选方块用完刷新
-- 消除后不下落 | 不支持旋转 | 计分采用配置化排分制 + Combo 奖励机会机制
+- 消除后不下落 | 不支持玩家旋转 | 方块形状由配置工具维护，方向变体作为独立形状随机出现
+- 计分采用配置化排分制 + Combo 奖励机会机制
 - 数据存储 PlayerPrefs | 先做 PC 再移动端
 - 棋盘代码动态生成（非 Tilemap）| M2 开始 Prefab 化
 
@@ -38,19 +39,20 @@ Unity_PJ_Z/
 ├── CODEBUDDY.md              ← 你正在读的文件（项目索引）
 ├── README.md                  # Git 仓库首页（极简）
 ├── Assets/
-│   ├── Scripts/               # C# 脚本（19 个，按模块分目录）
+│   ├── Scripts/               # C# 脚本（按模块分目录）
 │   │   ├── Core/              # GameManager, SceneBootstrap, Singleton, GameState
 │   │   ├── Board/             # BoardManager, MatchChecker
-│   │   ├── Block/             # BlockData, BlockSpawner, BlockDrag
+│   │   ├── Block/             # BlockData, BlockShapeDatabase, BlockSpawner, BlockDrag
 │   │   ├── Score/             # ScoreManager, ScoreConfig, ScoreCalculator
 │   │   ├── UI/                # GameUI, FloatingScoreManager, NumberImageDisplay
 │   │   ├── Utils/             # Constants, SpriteUtils
-│   │   └── Editor/            # CreateDigitAtlas, CreateGamePrefabs（编辑器工具）
+│   │   └── Editor/            # CreateDigitAtlas, CreateGamePrefabs, BlockShapeDatabaseEditorWindow（编辑器工具）
 │   ├── Scenes/Boot.unity      # 游戏主场景（挂 SceneBootstrap 启动一切）
 │   ├── Resources/
 │   │   ├── Art/               # 运行时加载的美术资源（Blocks/Board/Backgrounds/UI）
 │   │   ├── Configs/           # 运行时加载的配置资源（ScoreConfig）
 │   │   └── Digits/            # 数字精灵图（SH1/SH2 系列）
+│   ├── Configs/               # 编辑器维护的配置资产（BlockShapeDatabase 等）
 │   ├── Art/拆分资源/           # 美术原始切图（效果图 + UI 素材）
 │   ├── Prefabs/               # 预制体
 │   │   ├── Block/             # BlockCell
@@ -83,6 +85,7 @@ Unity_PJ_Z/
 | 文档 | 说明 |
 |------|------|
 | @设计文档/操作指南/SpriteAtlas图集打包指南.md | 数字图集的生成和使用方式 |
+| @设计文档/操作指南/方块形状配置工具使用指南.md | 方块形状配置工具的设计说明与使用流程 |
 
 ## 架构要点
 

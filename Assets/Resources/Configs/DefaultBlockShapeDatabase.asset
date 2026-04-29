@@ -1,0 +1,330 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4cb40d130234b8895e20a4dd43e21e6, type: 3}
+  m_Name: DefaultBlockShapeDatabase
+  m_EditorClassIdentifier: 
+  _databaseId: default
+  _displayName: "\u9ED8\u8BA4\u65B9\u5757\u5E93"
+  _editorGridColumns: 5
+  _editorGridRows: 5
+  _shapes:
+  - _id: Dot
+    _displayName: Dot
+    _enabled: 1
+    _weight: 5
+    _cells:
+    - {x: 0, y: 0}
+    _note: 
+  - _id: H2
+    _displayName: H2
+    _enabled: 1
+    _weight: 8
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    _note: 
+  - _id: V2
+    _displayName: V2
+    _enabled: 1
+    _weight: 8
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    _note: 
+  - _id: H3
+    _displayName: H3
+    _enabled: 1
+    _weight: 10
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    _note: 
+  - _id: V3
+    _displayName: V3
+    _enabled: 1
+    _weight: 10
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 0, y: 2}
+    _note: 
+  - _id: L3_0
+    _displayName: L3
+    _enabled: 1
+    _weight: 10
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 0, y: 1}
+    _note: 
+  - _id: H4
+    _displayName: H4
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    - {x: 3, y: 0}
+    _note: 
+  - _id: V4
+    _displayName: V4
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 0, y: 2}
+    - {x: 0, y: 3}
+    _note: 
+  - _id: Square
+    _displayName: Square
+    _enabled: 1
+    _weight: 8
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    _note: 
+  - _id: T4_0
+    _displayName: T4
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    - {x: 1, y: 1}
+    _note: 
+  - _id: S4_0
+    _displayName: S4
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 1, y: 1}
+    - {x: 2, y: 1}
+    _note: 
+  - _id: Z4_0
+    _displayName: Z4
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    _note: 
+  - _id: L4
+    _displayName: L4
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 0, y: 2}
+    - {x: 1, y: 0}
+    _note: 
+  - _id: J4
+    _displayName: J4
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 1, y: 1}
+    - {x: 1, y: 2}
+    - {x: 0, y: 0}
+    _note: 
+  - _id: BigSquare_0
+    _displayName: BigSquare
+    _enabled: 1
+    _weight: 1
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 2, y: 1}
+    - {x: 0, y: 2}
+    - {x: 1, y: 2}
+    - {x: 2, y: 2}
+    _note: 
+  - _id: BigL
+    _displayName: BigL
+    _enabled: 1
+    _weight: 3
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 0, y: 2}
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    _note: 
+  - _id: NewShape
+    _displayName: "\u65B0\u65B9\u5757"
+    _enabled: 1
+    _weight: 3
+    _cells:
+    - {x: 1, y: 2}
+    - {x: 2, y: 2}
+    - {x: 3, y: 2}
+    - {x: 2, y: 3}
+    - {x: 2, y: 1}
+    _note: 
+  - _id: NewShape_1_0
+    _displayName: "\u65B0\u65B9\u5757"
+    _enabled: 1
+    _weight: 2
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 2, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 2, y: 1}
+    - {x: 0, y: 2}
+    - {x: 2, y: 2}
+    _note: 
+  - _id: L3_90
+    _displayName: L3_90
+    _enabled: 1
+    _weight: 10
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 1, y: 1}
+    _note: 
+  - _id: L3_180
+    _displayName: L3_180
+    _enabled: 1
+    _weight: 10
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    _note: 
+  - _id: L3_270
+    _displayName: L3_270
+    _enabled: 1
+    _weight: 10
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    _note: 
+  - _id: NewShape_1_270
+    _displayName: "\u65B0\u65B9\u5757_270"
+    _enabled: 1
+    _weight: 2
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    - {x: 1, y: 1}
+    - {x: 0, y: 2}
+    - {x: 1, y: 2}
+    - {x: 2, y: 2}
+    _note: 
+  - _id: T4_90
+    _displayName: T4_90
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 1, y: 2}
+    _note: 
+  - _id: T4_180
+    _displayName: T4_180
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 2, y: 1}
+    _note: 
+  - _id: T4_270
+    _displayName: T4_270
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 0, y: 2}
+    _note: 
+  - _id: S4_90
+    _displayName: S4_90
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 0, y: 2}
+    _note: 
+  - _id: S4_180
+    _displayName: S4_180
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 1, y: 1}
+    - {x: 2, y: 1}
+    _note: 
+  - _id: S4_270
+    _displayName: S4_270
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 0, y: 2}
+    _note: 
+  - _id: Z4_90
+    _displayName: Z4_90
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 1, y: 2}
+    _note: 
+  - _id: Z4_180
+    _displayName: Z4_180
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 1, y: 0}
+    - {x: 2, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    _note: 
+  - _id: Z4_270
+    _displayName: Z4_270
+    _enabled: 1
+    _weight: 6
+    _cells:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 1}
+    - {x: 1, y: 2}
+    _note: 
+  _note: "\u7531\u65B9\u5757\u5F62\u72B6\u914D\u7F6E\u5668\u521B\u5EFA\u3002"

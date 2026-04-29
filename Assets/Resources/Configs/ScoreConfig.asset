@@ -13,12 +13,7 @@ MonoBehaviour:
   m_Name: ScoreConfig
   m_EditorClassIdentifier: 
   _placementScorePerCell: 1
-  _lineTierScores:
-  - 1
-  - 3
-  - 5
-  - 7
-  - 9
+  _lineTierScores: 0100000003000000050000000700000009000000
   _extraLineTierStep: 2
   _enableCombo: 1
   _comboBonusFactor: 20

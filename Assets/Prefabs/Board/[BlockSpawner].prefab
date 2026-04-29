@@ -49,4 +49,6 @@ MonoBehaviour:
   _candidateBoardSprite: {fileID: 6566661897477329138, guid: 130ee34bcb04a52409a85d3a07952716, type: 3}
   _candidateBoardSize: 1
   _candidateSlotPrefab: {fileID: 1768493203503172699, guid: f0b9516f79b51e74dbb8295bf6e1c175, type: 3}
+  _shapeDatabase: {fileID: 11400000, guid: c1444c53c7594242b5ff12af4e312a5d, type: 2}
   _looseCandidateDrag: 1
+

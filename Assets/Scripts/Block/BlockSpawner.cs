@@ -34,6 +34,13 @@ namespace BlockPuzzle.Block
         [Tooltip("候选槽位 Prefab（可选）。Prefab 内名为 'BlockAnchor' 的子对象将作为方块挂载点。")]
         [SerializeField] private GameObject _candidateSlotPrefab;
 
+        [Header("方块形状配置")]
+        [Tooltip("当前运行时使用的方块形状数据库。为空或无有效形状时，回退到代码内置形状表。")]
+        [SerializeField] private BlockShapeDatabase _shapeDatabase;
+
+        /// <summary>设置运行时方块形状数据库</summary>
+        public void SetShapeDatabase(BlockShapeDatabase database) { _shapeDatabase = database; }
+
         // BlockCell/CandidateBoard/CandidateSlot Prefab 由 BlockSpawner 自身 Inspector 配置，不再需要外部注入
 
         [Header("拖拽配置")]
@@ -273,6 +280,14 @@ namespace BlockPuzzle.Block
 
         // ==================== 生成候选方块 ====================
 
+        private BlockData GetRandomShapeData()
+        {
+            if (_shapeDatabase != null && _shapeDatabase.TryGetRandomShape(out var configuredData))
+                return configuredData;
+
+            return BlockData.GetRandomShape();
+        }
+
         private void SpawnCandidates()
         {
             // 锚点等间距排列：CandidateSpacing 控制每个方块坐标轴之间的距离
@@ -281,7 +296,7 @@ namespace BlockPuzzle.Block
 
             for (int i = 0; i < Constants.CandidateCount; i++)
             {
-                var data = BlockData.GetRandomShape();
+                var data = GetRandomShapeData();
                 _candidateData[i] = data;
 
                 int colorIndex = UnityEngine.Random.Range(0, Constants.BlockColors.Length);
