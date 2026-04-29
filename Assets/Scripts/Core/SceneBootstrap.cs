@@ -44,6 +44,11 @@ namespace BlockPuzzle.Core
         [Tooltip("背景 Canvas Prefab（含背景图、候选区底板装饰等固定 UI）")]
         [SerializeField] private GameObject _backgroundCanvasPrefab;
 
+        // ==================== 玩法配置 ====================
+        [Header("玩法配置")]
+        [Tooltip("本场景启动时传给 ScoreManager 的计分配置。可为不同模式指定不同 ScoreConfig；为空时默认加载 Resources/Configs/ScoreConfig。")]
+        [SerializeField] private ScoreConfig _scoreConfig;
+
         // ==================== 候选区布局参数 ====================
         [Header("候选区布局")]
         [Tooltip("候选区中心的世界坐标")]
@@ -179,11 +184,13 @@ namespace BlockPuzzle.Core
             }
 
             // ScoreManager
-            if (FindFirstObjectByType<ScoreManager>() == null)
+            var scoreManager = FindFirstObjectByType<ScoreManager>();
+            if (scoreManager == null)
             {
                 var scoreGo = new GameObject("[ScoreManager]");
-                scoreGo.AddComponent<ScoreManager>();
+                scoreManager = scoreGo.AddComponent<ScoreManager>();
             }
+            scoreManager.SetConfig(_scoreConfig);
 
             // GameManager（最后创建）
             if (FindFirstObjectByType<GameManager>() == null)
@@ -261,14 +268,16 @@ namespace BlockPuzzle.Core
             // 监听消除计分事件，驱动飘字
             if (Score.ScoreManager.Instance != null)
             {
-                Score.ScoreManager.Instance.OnLineClearScoreDetail += (lineCount, baseScore, comboBonus, comboCount) =>
+                var scoreManager = Score.ScoreManager.Instance;
+                scoreManager.OnLineClearScoreDetail += (lineCount, baseScore, comboBonus, comboCount) =>
                 {
-                    floatingMgr.EnqueuePlacementScore(baseScore > 0 ? (int)(baseScore / (lineCount * 2 - 1)) : lineCount);
+                    floatingMgr.EnqueuePlacementScore(scoreManager.LastPlacementScore);
                     floatingMgr.EnqueueClearScore(baseScore, lineCount);
-                    if (comboCount > 0)
-                        floatingMgr.EnqueueComboBonus(comboCount, Utils.Constants.GetComboMultiplier(comboCount));
+                    if (comboBonus > 0)
+                        floatingMgr.EnqueueComboBonus(comboCount, comboBonus);
                     floatingMgr.PlayAll();
                 };
+
 
                 floatingMgr.OnAllFinished += () =>
                 {

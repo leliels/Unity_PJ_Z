@@ -5,20 +5,21 @@ using UnityEngine;
 using UnityEngine.UI;
 using BlockPuzzle.Core;
 using BlockPuzzle.Score;
-using BlockPuzzle.Utils;
+
 
 namespace BlockPuzzle.UI
 {
     /// <summary>
     /// 消除得分飘字管理器：
-    /// 消除发生时逐条展示每项得分（放置分、消除分、Combo 加成），
-    /// 播完后汇入总分并触发总分跳动效果。
+    /// 消除发生时逐条展示每项得分（放置分、消除基础加分、Combo 加成），
+    /// 播完后触发总分跳动效果。
     ///
-    /// 流程（对应设计文档 123-131）：
+    /// 流程：
     /// ① 显示放置分飘字（如 "+4"）
-    /// ② 逐行显示消除分飘字（如 "+16"、"+256"）
-    /// ③ 如果有 Combo → 显示 Combo 加成飘字（如 "Combo ×1 → ×1.2"）
+    /// ② 显示消除基础加分飘字（如 "+12"）
+    /// ③ 如果有 Combo → 显示 Combo 加成飘字（如 "Combo ×2 +240"）
     /// ④ 所有飘字展示完毕后 → 触发 OnAllFinished 回调 → 总分跳动
+
     /// </summary>
     public class FloatingScoreManager : MonoBehaviour
     {
@@ -74,18 +75,18 @@ namespace BlockPuzzle.UI
         public void SetFloatingScorePrefab(GameObject prefab) { if (_floatingScorePrefab == null) _floatingScorePrefab = prefab; }
 
         /// <summary>
-        /// 添加放置分飘字
+        /// 添加放置分飘字。
         /// </summary>
-        public void EnqueuePlacementScore(int cellCount)
+        public void EnqueuePlacementScore(int placementScore)
         {
-            int score = cellCount * Constants.ScorePerCell;
-            if (score <= 0) return;
+            if (placementScore <= 0) return;
             _pendingEntries.Enqueue(new FloatEntry
             {
-                text = $"+{score}",
+                text = $"+{placementScore}",
                 color = PlacementColor
             });
         }
+
 
         /// <summary>
         /// 添加消除分飘字（单行/列的分数）
@@ -102,19 +103,18 @@ namespace BlockPuzzle.UI
         }
 
         /// <summary>
-        /// 添加 Combo 加成飘字（格式：Combo ×N → ×M）
+        /// 添加 Combo 加成飘字。
         /// </summary>
-        public void EnqueueComboBonus(int comboCount, float multiplier)
+        public void EnqueueComboBonus(int comboCount, long bonusScore)
         {
-            if (comboCount <= 0) return;
-            // 设计文档 129 行格式："Combo ×1 → ×1.2"
-            float nextMultiplier = 1f + (comboCount + 1) * 0.2f; // 下一次 Combo 系数
+            if (comboCount <= 0 || bonusScore <= 0) return;
             _pendingEntries.Enqueue(new FloatEntry
             {
-                text = $"Combo ×{comboCount} → ×{nextMultiplier:F1}",
+                text = $"Combo ×{comboCount} +{bonusScore}",
                 color = ComboColor
             });
         }
+
 
         /// <summary>
         /// 开始播放所有待显示的飘字

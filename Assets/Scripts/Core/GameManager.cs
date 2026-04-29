@@ -103,15 +103,14 @@ namespace BlockPuzzle.Core
         }
 
         /// <summary>
-        /// 在方块放置并完成消除检测后调用。
-        /// 设计文档 118-124：Combo 窗口只按消除次数消耗，
-        /// 放置未消除不再中断 Combo（与旧版无限连击逻辑不同）。
+        /// 在方块放置并完成消除检测后调用，用于处理“未消除是否重置 Combo”的配置开关。
         /// </summary>
         public void OnTurnComplete()
         {
-            // 新规则：Combo 由 3 次消除机会窗口控制，不在此处重置
-            // _clearedThisTurn 标记暂保留供其他逻辑使用
+            if (!_clearedThisTurn)
+                ScoreManager.Instance.OnTurnCompletedWithoutClear();
         }
+
 
         private void HandleGameOver()
         {

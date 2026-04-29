@@ -458,6 +458,7 @@ MonoBehaviour:
   _floatingScorePrefab: {fileID: 5401398499684499093, guid: ec6b91fdf3e87904db30599e3c4a73bb, type: 3}
   _restartButtonPrefab: {fileID: 5453980460094230541, guid: a292d505a2852e24d93a5cad726ac14c, type: 3}
   _backgroundCanvasPrefab: {fileID: 5934255449006602508, guid: 6292a563e2be5804dae86c7cc433fb01, type: 3}
+  _scoreConfig: {fileID: 11400000, guid: 639b64de0427eef4eb472683b33f7a14, type: 2}
   _candidateCenter: {x: 0, y: -8.5, z: 0}
   _candidateSpacing: 3.5
   _candidateScale: 0.35

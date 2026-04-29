@@ -27,7 +27,7 @@
 ## 关键技术决策
 
 - 竖屏 1080×1920 | 8×8 棋盘 | 3 候选方块用完刷新
-- 消除后不下落 | 不支持旋转 | 计分 16^N + Combo(+0.2/次)
+- 消除后不下落 | 不支持旋转 | 计分采用配置化排分制 + Combo 奖励机会机制
 - 数据存储 PlayerPrefs | 先做 PC 再移动端
 - 棋盘代码动态生成（非 Tilemap）| M2 开始 Prefab 化
 
@@ -38,17 +38,18 @@ Unity_PJ_Z/
 ├── CODEBUDDY.md              ← 你正在读的文件（项目索引）
 ├── README.md                  # Git 仓库首页（极简）
 ├── Assets/
-│   ├── Scripts/               # C# 脚本（17 个，按模块分目录）
+│   ├── Scripts/               # C# 脚本（19 个，按模块分目录）
 │   │   ├── Core/              # GameManager, SceneBootstrap, Singleton, GameState
 │   │   ├── Board/             # BoardManager, MatchChecker
 │   │   ├── Block/             # BlockData, BlockSpawner, BlockDrag
-│   │   ├── Score/             # ScoreManager
+│   │   ├── Score/             # ScoreManager, ScoreConfig, ScoreCalculator
 │   │   ├── UI/                # GameUI, FloatingScoreManager, NumberImageDisplay
 │   │   ├── Utils/             # Constants, SpriteUtils
 │   │   └── Editor/            # CreateDigitAtlas, CreateGamePrefabs（编辑器工具）
 │   ├── Scenes/Boot.unity      # 游戏主场景（挂 SceneBootstrap 启动一切）
 │   ├── Resources/
 │   │   ├── Art/               # 运行时加载的美术资源（Blocks/Board/Backgrounds/UI）
+│   │   ├── Configs/           # 运行时加载的配置资源（ScoreConfig）
 │   │   └── Digits/            # 数字精灵图（SH1/SH2 系列）
 │   ├── Art/拆分资源/           # 美术原始切图（效果图 + UI 素材）
 │   ├── Prefabs/               # 预制体

@@ -21,15 +21,6 @@ namespace BlockPuzzle.Utils
         public static float CandidateScale = 0.35f;     // 候选方块缩放比例
         public static float CandidateSpacing = 3.5f;    // 候选方块间距
 
-        // --- 计分规则（2026-04-28 排分制） ---
-        public const int ScorePerCell = 1;               // 放置每格分数
-        /// <summary>Combo 加成基数</summary>
-        public const int ComboBaseScore = 20;            // Combo 部分的基础系数
-
-        // --- 旧计分常量（保留兼容，已不再使用） ---
-        [System.Obsolete("排分制不再使用 16^N 公式，请使用 ScoreManager 内部公式", false)] public const int LineClearBase = 0;
-        [System.Obsolete("排分制不再使用线性 Combo 系数，请使用 ScoreManager 内部公式", false)] public const float ComboMultiplierStep = 0f;
-
         // --- 布局位置（可在 Inspector 调整） ---
         public static Vector3 BoardCenter = new Vector3(0f, -0.1f, 0f);
         public static Vector3 CandidateCenter = new Vector3(0f, -8.5f, 0f);
@@ -55,26 +46,6 @@ namespace BlockPuzzle.Utils
             new Color(0.70f, 0.35f, 0.90f, 1f), // 紫
         };
 
-        /// <summary>
-        /// 根据消除行/列数计算消除分数（16^N 幂次公式）
-        /// </summary>
-        public static long GetLineClearScore(int lineCount)
-        {
-            if (lineCount <= 0) return 0;
-            long score = 1;
-            for (int i = 0; i < lineCount; i++)
-                score *= LineClearBase;
-            return score; // 1排=16, 2排=256, 3排=4096, 4排=65536
-        }
 
-        /// <summary>
-        /// 根据 Combo 次数获取乘数（1 + N * 0.2）
-        /// Combo 0 = 第一次消除，系数 1.0（无加成）
-        /// Combo 1 = 第二次连续消除，系数 1.2
-        /// </summary>
-        public static float GetComboMultiplier(int comboCount)
-        {
-            return 1f + comboCount * ComboMultiplierStep;
-        }
     }
 }
