@@ -13,7 +13,7 @@
 |--------|------|------|
 | M0 项目准备 | ✅ | 文档、目录、美术效果图 |
 | M1 核心原型 | ✅ | 棋盘+方块+拖拽+消除+计分，已验收 |
-| M2 数值体验+换皮 | 🔵 收尾中 | 任务1-5已完成大部分，方块形状配置工具已接入，待运行验证 |
+| M2 数值体验+换皮 | 🔵 收尾中 | 计分、Prefab 化、美术替换与配置工具等核心能力推进中 |
 | M3 完整玩法 | ⬜ | UI流程+游戏模式+存档+音效 |
 | M4 内容填充 | ⬜ | 特效+音效+冒险模式机制 |
 | M5 打磨上线 | ⬜ | Bug修复+适配+上架 |
@@ -40,13 +40,13 @@ Unity_PJ_Z/
 ├── README.md                  # Git 仓库首页（极简）
 ├── Assets/
 │   ├── Scripts/               # C# 脚本（按模块分目录）
-│   │   ├── Core/              # GameManager, SceneBootstrap, Singleton, GameState
-│   │   ├── Board/             # BoardManager, MatchChecker
-│   │   ├── Block/             # BlockData, BlockShapeDatabase, BlockSpawner, BlockDrag
-│   │   ├── Score/             # ScoreManager, ScoreConfig, ScoreCalculator
-│   │   ├── UI/                # GameUI, FloatingScoreManager, NumberImageDisplay
-│   │   ├── Utils/             # Constants, SpriteUtils
-│   │   └── Editor/            # CreateDigitAtlas, CreateGamePrefabs, BlockShapeDatabaseEditorWindow（编辑器工具）
+│   │   ├── Core/              # 核心启动、状态与全局管理
+│   │   ├── Board/             # 棋盘、放置、消除检测
+│   │   ├── Block/             # 方块数据、生成、拖拽与形状配置
+│   │   ├── Score/             # 计分配置、计算与状态管理
+│   │   ├── UI/                # HUD、分数显示、飘字与面板
+│   │   ├── Utils/             # 通用工具
+│   │   └── Editor/            # 编辑器工具（不打包）
 │   ├── Scenes/Boot.unity      # 游戏主场景（挂 SceneBootstrap 启动一切）
 │   ├── Resources/
 │   │   ├── Art/               # 运行时加载的美术资源（Blocks/Board/Backgrounds/UI）
@@ -62,6 +62,7 @@ Unity_PJ_Z/
 ├── Packages/                  # Unity 包管理
 ├── ProjectSettings/           # 项目设置
 └── 设计文档/                   # 设计文档目录（见下方索引）
+    ├── 会议内容/               # 开发人员自己用的一些文档，ai不用看
     └── 操作指南/               # 操作类使用说明文档
 ```
 
@@ -97,6 +98,9 @@ Unity_PJ_Z/
 
 ## 开发规则
 
-- **先文档后代码**：大的功能设计变更，先更新设计文档，再写代码
-- **保持文档同步**：代码完成后更新 06-开发计划.md 的 checkbox 和开发日志
-- **会议内容 ≠ 正式文档**：`设计文档/会议内容/` 仅为原始记录，结论必须同步到正式文档才生效
+- **CODEBUDDY.md 是项目索引，不是开发日志**：只有项目定位、里程碑、关键技术决策、顶层目录、文档索引或核心架构发生变化时才更新；普通新增脚本、Prefab、资源或小逻辑修改不要改本文件。
+- **文档批量同步**：功能开发过程中优先完成代码与 Unity 配置；一个完整功能/阶段完成并验证后，再一次性更新相关正式文档，避免每新增一个脚本就改多份文档。
+- **按文档职责更新**：架构细节写 `03-技术架构文档.md`，任务状态和阶段日志写 `06-开发计划.md`，操作步骤写 `设计文档/操作指南/`；不要把细节重复写进 `CODEBUDDY.md`。
+- **先文档后代码的适用范围**：仅限用户说明要求如此时，一般是在做玩法规则、架构方向、资源规范等大的设计变更时用户会需要使用；普通实现细节不需要先改文档。
+- **会议内容 ≠ 正式文档**：`设计文档/会议内容/` 仅为原始记录，结论必须同步到正式文档才生效。
+
