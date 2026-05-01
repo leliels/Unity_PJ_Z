@@ -20,24 +20,34 @@ namespace BlockPuzzle.UI
         [SerializeField] private GameObject _gameOverPanel;
         [SerializeField] private Text _finalScoreText;
         [SerializeField] private Button _restartButton;
+        [SerializeField] private Button _returnTitleButton;
+
+        private ScoreManager _scoreManager;
+        private GameManager _gameManager;
 
         private void Start()
         {
             // 注册事件
-            if (ScoreManager.Instance != null)
+            _scoreManager = ScoreManager.Current ?? ScoreManager.Instance;
+            if (_scoreManager != null)
             {
-                ScoreManager.Instance.OnScoreChanged += UpdateScoreDisplay;
-                ScoreManager.Instance.OnHighScoreChanged += UpdateHighScoreDisplay;
+                _scoreManager.OnScoreChanged += UpdateScoreDisplay;
+                _scoreManager.OnHighScoreChanged += UpdateHighScoreDisplay;
                 // 初始显示最高分
-                UpdateHighScoreDisplay(ScoreManager.Instance.HighScore);
+                UpdateHighScoreDisplay(_scoreManager.HighScore);
             }
 
-            if (GameManager.Instance != null)
-                GameManager.Instance.OnGameStateChanged += HandleGameStateChanged;
+            _gameManager = GameManager.Current ?? GameManager.Instance;
+            if (_gameManager != null)
+                _gameManager.OnGameStateChanged += HandleGameStateChanged;
+
+            EnsureGameOverButtons();
 
             // 重新开始按钮
             if (_restartButton != null)
                 _restartButton.onClick.AddListener(OnRestartClicked);
+            if (_returnTitleButton != null)
+                _returnTitleButton.onClick.AddListener(OnReturnTitleClicked);
 
             // 初始状态
             if (_gameOverPanel != null)
@@ -48,14 +58,23 @@ namespace BlockPuzzle.UI
 
         private void OnDestroy()
         {
-            if (ScoreManager.Instance != null)
+            if (_scoreManager != null)
             {
-                ScoreManager.Instance.OnScoreChanged -= UpdateScoreDisplay;
-                ScoreManager.Instance.OnHighScoreChanged -= UpdateHighScoreDisplay;
+                _scoreManager.OnScoreChanged -= UpdateScoreDisplay;
+                _scoreManager.OnHighScoreChanged -= UpdateHighScoreDisplay;
+                _scoreManager = null;
             }
 
-            if (GameManager.Instance != null)
-                GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
+            if (_gameManager != null)
+            {
+                _gameManager.OnGameStateChanged -= HandleGameStateChanged;
+                _gameManager = null;
+            }
+
+            if (_restartButton != null)
+                _restartButton.onClick.RemoveListener(OnRestartClicked);
+            if (_returnTitleButton != null)
+                _returnTitleButton.onClick.RemoveListener(OnReturnTitleClicked);
         }
 
         private void UpdateHighScoreDisplay(int highScore)
@@ -97,7 +116,11 @@ namespace BlockPuzzle.UI
                 _gameOverPanel.SetActive(true);
 
                 if (_finalScoreText != null)
-                    _finalScoreText.text = $"Final Score\n{ScoreManager.Instance.CurrentScore}";
+                {
+                    int score = _scoreManager != null ? _scoreManager.CurrentScore : 0;
+                    int highScore = _scoreManager != null ? _scoreManager.HighScore : 0;
+                    _finalScoreText.text = $"游戏结束\n本局得分：{score}\n最高分：{highScore}";
+                }
             }
         }
 
@@ -107,9 +130,31 @@ namespace BlockPuzzle.UI
                 _gameOverPanel.SetActive(false);
         }
 
+        private void EnsureGameOverButtons()
+        {
+            if (_gameOverPanel == null) return;
+
+            if (_returnTitleButton == null)
+            {
+                var existing = _gameOverPanel.transform.Find("ReturnTitleButton");
+                _returnTitleButton = existing != null ? existing.GetComponent<Button>() : null;
+            }
+
+            if (_returnTitleButton == null)
+            {
+                _returnTitleButton = RuntimeUiFactory.CreateButton(_gameOverPanel.transform, "ReturnTitleButton", "返回 Title", new Vector2(300f, 72f), new Color(0.35f, 0.35f, 0.45f, 1f));
+                _returnTitleButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -190f);
+            }
+        }
+
         private void OnRestartClicked()
         {
-            GameManager.Instance.RestartGame();
+            (_gameManager != null ? _gameManager : GameManager.Current)?.RestartGame();
+        }
+
+        private void OnReturnTitleClicked()
+        {
+            (_gameManager != null ? _gameManager : GameManager.Current)?.ReturnToTitle();
         }
     }
 }

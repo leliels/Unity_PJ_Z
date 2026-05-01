@@ -1,13 +1,16 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using BlockPuzzle.Board;
 using BlockPuzzle.Block;
+using BlockPuzzle.Mode;
+using BlockPuzzle.Save;
 using BlockPuzzle.Score;
 
 namespace BlockPuzzle.Core
 {
     /// <summary>
-    /// 游戏总管理器：协调各系统初始化和状态控制
+    /// 游戏总管理器：协调传统模式的游戏流程和状态控制
     /// </summary>
     public class GameManager : Singleton<GameManager>
     {
@@ -17,45 +20,60 @@ namespace BlockPuzzle.Core
         private GameState _currentState;
         public GameState CurrentState => _currentState;
 
-        // 标记本次放置是否触发了消除（用于 Combo 判定）
         private bool _clearedThisTurn;
+        private bool _eventsRegistered;
+        private bool _resultRecorded;
+        private DateTime _playStartTime;
+        private BoardManager _boardManager;
 
         private void Start()
         {
             StartGame();
         }
 
-        /// <summary>
-        /// 开始新游戏
-        /// </summary>
+        /// <summary>开始新游戏</summary>
         public void StartGame()
         {
-            // 初始化分数
+            _resultRecorded = false;
+            _playStartTime = DateTime.Now;
+
             ScoreManager.Instance.ResetScore();
-
-            // 初始化棋盘
             BoardManager.Instance.ClearBoard();
-
-            // 初始化候选方块
             BlockSpawner.Instance.ClearAll();
             BlockSpawner.Instance.Init();
 
             _clearedThisTurn = false;
-
-            // 注册事件
             RegisterEvents();
-
-            // 设置状态
             SetState(GameState.Playing);
         }
 
-        /// <summary>
-        /// 重新开始游戏
-        /// </summary>
+        /// <summary>重新开始游戏</summary>
         public void RestartGame()
         {
             UnregisterEvents();
             StartGame();
+        }
+
+        public void PauseGame()
+        {
+            if (_currentState == GameState.Playing)
+                SetState(GameState.Paused);
+        }
+
+        public void ResumeGame()
+        {
+            if (_currentState == GameState.Paused)
+                SetState(GameState.Playing);
+        }
+
+        public void ReturnToTitle()
+        {
+            RecordResultIfNeeded(false);
+            UnregisterEvents();
+            if (ModeManager.Instance != null)
+                ModeManager.Instance.ReturnToTitle();
+            else
+                SceneManager.LoadScene("Title");
         }
 
         private void SetState(GameState newState)
@@ -64,59 +82,63 @@ namespace BlockPuzzle.Core
             OnGameStateChanged?.Invoke(_currentState);
         }
 
-        // ==================== 事件管理 ====================
-
         private void RegisterEvents()
         {
-            BoardManager.Instance.OnBlockPlaced += HandleBlockPlaced;
-            BoardManager.Instance.OnLinesCleared += HandleLinesCleared;
-            BoardManager.Instance.OnGameOver += HandleGameOver;
+            if (_eventsRegistered) return;
+            _boardManager = BoardManager.Current ?? BoardManager.Instance;
+            if (_boardManager == null) return;
+
+            _boardManager.OnBlockPlaced += HandleBlockPlaced;
+            _boardManager.OnLinesCleared += HandleLinesCleared;
+            _boardManager.OnGameOver += HandleGameOver;
+            _eventsRegistered = true;
         }
 
         private void UnregisterEvents()
         {
-            if (BoardManager.Instance != null)
-            {
-                BoardManager.Instance.OnBlockPlaced -= HandleBlockPlaced;
-                BoardManager.Instance.OnLinesCleared -= HandleLinesCleared;
-                BoardManager.Instance.OnGameOver -= HandleGameOver;
-            }
+            if (!_eventsRegistered || _boardManager == null) return;
+            _boardManager.OnBlockPlaced -= HandleBlockPlaced;
+            _boardManager.OnLinesCleared -= HandleLinesCleared;
+            _boardManager.OnGameOver -= HandleGameOver;
+            _boardManager = null;
+            _eventsRegistered = false;
         }
 
         private void HandleBlockPlaced(int cellCount)
         {
-            // 重置标记：等待消除事件
             _clearedThisTurn = false;
-
-            // 普通放置不直接加分，只记录本次方块占格数 C
             ScoreManager.Instance.RecordPlacedCells(cellCount);
         }
 
         private void HandleLinesCleared(int lineCount)
         {
-            if (lineCount > 0)
-            {
-                _clearedThisTurn = true;
-                // 触发消除时按新版公式结算分数
-                ScoreManager.Instance.AddLineClearScore(lineCount);
-            }
+            if (lineCount <= 0) return;
+            _clearedThisTurn = true;
+            ScoreManager.Instance.AddLineClearScore(lineCount);
         }
 
-        /// <summary>
-        /// 在方块放置并完成消除检测后调用，用于处理未消除时的 CCD 递减。
-        /// </summary>
+        /// <summary>在方块放置并完成消除检测后调用，用于处理未消除时的 CCD 递减。</summary>
         public void OnTurnComplete()
         {
             if (!_clearedThisTurn)
                 ScoreManager.Instance.OnTurnCompletedWithoutClear();
         }
 
-
         private void HandleGameOver()
         {
-            SetState(GameState.GameOver);
-            // 游戏结束时尝试更新最高分
             ScoreManager.Instance.TryUpdateHighScore();
+            RecordResultIfNeeded(true);
+            SetState(GameState.GameOver);
+        }
+
+        private void RecordResultIfNeeded(bool gameOver)
+        {
+            if (_resultRecorded || SaveManager.Instance == null || ScoreManager.Instance == null) return;
+            if (!gameOver && ScoreManager.Instance.CurrentScore <= 0) return;
+
+            string modeId = ModeManager.Instance != null ? ModeManager.Instance.CurrentModeId : GameModeConfig.TraditionalId;
+            SaveManager.Instance.RegisterPlayResult(modeId, ScoreManager.Instance.CurrentScore, _playStartTime, DateTime.Now);
+            _resultRecorded = true;
         }
 
         protected override void OnDestroy()
@@ -126,3 +148,4 @@ namespace BlockPuzzle.Core
         }
     }
 }
+

@@ -10,7 +10,7 @@ using System.IO;
 /// </summary>
 public static class CreateGamePrefabs
 {
-    [MenuItem("Tools/创建游戏 Prefab（一键生成）", false, 200)]
+    [MenuItem("BlockPuzzle/AI 工具/创建游戏 Prefab（一键生成）", false, 200)]
     public static void Execute()
     {
         EnsureFolder("Assets/Prefabs/UI");

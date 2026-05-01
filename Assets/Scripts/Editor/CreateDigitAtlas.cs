@@ -15,7 +15,7 @@ using System.IO;
 /// </summary>
 public static class CreateDigitAtlas
 {
-    [MenuItem("Tools/Create Digit Sprite Atlas", false, 100)]
+    [MenuItem("BlockPuzzle/AI 工具/Create Digit Sprite Atlas", false, 201)]
     public static void Execute()
     {
         string atlasPath = "Assets/Art/DigitSpritesAtlas.spriteatlas";

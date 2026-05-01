@@ -1,4 +1,5 @@
 using UnityEngine;
+using BlockPuzzle.Audio;
 using BlockPuzzle.Board;
 using BlockPuzzle.Utils;
 #if ENABLE_INPUT_SYSTEM
@@ -23,6 +24,7 @@ namespace BlockPuzzle.Block
         private bool _isDragging;
         private Camera _mainCam;
         private Collider2D _collider;
+        private BlockAudioFeedback _audioFeedback;
 
         /// <summary>
         /// 候选区宽松拖拽模式：手指在候选区范围内任意位置即可拖动最近的方块。
@@ -94,6 +96,7 @@ namespace BlockPuzzle.Block
             _mainCam = Camera.main;
             if (_mainCam == null) return;
             _collider = GetComponent<Collider2D>();
+            _audioFeedback = GetComponent<BlockAudioFeedback>();
             // 如果自身没有 Collider2D，尝试从子对象获取（如 Slot→Block 层级结构）
             if (_collider == null)
                 _collider = GetComponentInChildren<Collider2D>();
@@ -165,6 +168,8 @@ namespace BlockPuzzle.Block
         private void BeginDrag(Vector3 pointerWorld)
         {
             _isDragging = true;
+            _audioFeedback?.PlayPick();
+            _audioFeedback?.PlayDragBegin();
             // 拖拽时缩放到与棋盘格子一致的大小（棋盘有 VisualScale 缩放）
             float dragScale = BoardManager.Instance != null ? BoardManager.Instance.VisualScale : 1f;
             transform.localScale = Vector3.one * dragScale;
@@ -203,6 +208,7 @@ namespace BlockPuzzle.Block
 
             if (BoardManager.Instance.CanPlace(_blockData.Cells, gridPos.x, gridPos.y))
             {
+                _audioFeedback?.PlayDropSuccess();
                 BoardManager.Instance.PlaceBlock(_blockData.Cells, gridPos.x, gridPos.y, _blockColor);
                 BlockSpawner.Instance.MarkUsed(_candidateIndex);
 
@@ -213,6 +219,7 @@ namespace BlockPuzzle.Block
             }
             else
             {
+                _audioFeedback?.PlayDropFailed();
                 // 放置失败，回到原位
                 transform.position = _originalPosition;
                 transform.localScale = _originalScale;
@@ -222,6 +229,7 @@ namespace BlockPuzzle.Block
         private void CancelDrag()
         {
             _isDragging = false;
+            _audioFeedback?.PlayCancel();
             if (BoardManager.Instance != null)
             {
                 BoardManager.Instance.ClearPreview();

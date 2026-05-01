@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a87f1941341b1e49868a0ab6ccd46e1, type: 3}
+  m_Name: PlaceholderAudioCue
+  m_EditorClassIdentifier: Assembly-CSharp::BlockPuzzle.Audio.AudioCue
+  _clips:
+  - {fileID: 8300000, guid: c2e237c50662beb4e82c75c8cbd04a88, type: 3}
+  _volume: 0.85
+  _delay: 0
+  _pitchRange: {x: 0.95, y: 1.05}
+  _loop: 0
+  _cooldown: 0.03
+  _useGlobalSfxVolume: 1

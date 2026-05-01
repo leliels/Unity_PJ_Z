@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 363f8c47a31d27e488f8343c9c74f439, type: 3}
+  m_Name: AudioLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::BlockPuzzle.Audio.AudioLibrary
+  _uiClick: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _uiOpen: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _uiClose: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _blockPick: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _blockDragBegin: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _blockDropSuccess: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _blockDropFailed: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _blockPlace: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _clearLine: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _scoreTick: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _gameOver: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _candidatesRefresh: {fileID: 11400000, guid: fa02e4a3755ae0248a4fb80bdb275222, type: 2}
+  _titleBgm: {fileID: 8300000, guid: c62da1193200c0a4a933ccdf75321afd, type: 3}
+  _gameBgm: {fileID: 8300000, guid: c62da1193200c0a4a933ccdf75321afd, type: 3}

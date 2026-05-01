@@ -1,5 +1,7 @@
 using System;
 using BlockPuzzle.Core;
+using BlockPuzzle.Mode;
+using BlockPuzzle.Save;
 using UnityEngine;
 
 namespace BlockPuzzle.Score
@@ -81,9 +83,7 @@ namespace BlockPuzzle.Score
             _lastPlacedCellCount = 0;
             _comboState.Reset(Config);
 
-            // 首次或重置时从 PlayerPrefs 加载最高分
-            if (_highScore == 0)
-                _highScore = PlayerPrefs.GetInt("BlockPuzzle_HighScore", 0);
+            _highScore = LoadHighScore();
 
             OnScoreChanged?.Invoke(_score);
             OnComboChanged?.Invoke(_comboState.ComboCount);
@@ -99,8 +99,14 @@ namespace BlockPuzzle.Score
             if (_score > _highScore)
             {
                 _highScore = _score;
-                PlayerPrefs.SetInt("BlockPuzzle_HighScore", _highScore);
-                PlayerPrefs.Save();
+                string modeId = ModeManager.Instance != null ? ModeManager.Instance.CurrentModeId : GameModeConfig.TraditionalId;
+                if (SaveManager.Instance != null)
+                    SaveManager.Instance.TryUpdateHighScore(modeId, _highScore);
+                else
+                {
+                    PlayerPrefs.SetInt("BlockPuzzle_HighScore", _highScore);
+                    PlayerPrefs.Save();
+                }
                 Debug.Log($"[Score] 新最高分: {_highScore}");
                 OnHighScoreChanged?.Invoke(_highScore);
                 return true;
@@ -179,6 +185,14 @@ namespace BlockPuzzle.Score
             nextScore = Math.Min(nextScore, Config.MaxScoreClamp);
             nextScore = Math.Max(0, nextScore);
             _score = (int)nextScore;
+        }
+
+        private int LoadHighScore()
+        {
+            string modeId = ModeManager.Instance != null ? ModeManager.Instance.CurrentModeId : GameModeConfig.TraditionalId;
+            if (SaveManager.Instance != null)
+                return SaveManager.Instance.GetHighScore(modeId);
+            return PlayerPrefs.GetInt("BlockPuzzle_HighScore", 0);
         }
 
         private void EnsureConfig()

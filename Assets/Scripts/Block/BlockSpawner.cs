@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using BlockPuzzle.Audio;
 using BlockPuzzle.Core;
 using BlockPuzzle.Board;
 using BlockPuzzle.Utils;
@@ -379,6 +380,10 @@ namespace BlockPuzzle.Block
                     // 命中子碰撞体而非 Slot 碰撞体，导致拖拽检测失败
                     Destroy(blockCollider);
                 }
+
+                // 可配置音效反馈挂在 Slot 上，BlockDrag 触发播放
+                if (slotGo.GetComponent<BlockAudioFeedback>() == null)
+                    slotGo.AddComponent<BlockAudioFeedback>();
 
                 // BlockDrag 挂在 Slot 上，操作整个槽位
                 var drag = slotGo.AddComponent<BlockDrag>();

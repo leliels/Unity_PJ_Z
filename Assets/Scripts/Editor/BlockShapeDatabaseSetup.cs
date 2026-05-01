@@ -8,7 +8,7 @@ public static class BlockShapeDatabaseSetup
     private const string DefaultFolder = "Assets/Configs/BlockShapes";
     private const string BlockSpawnerPrefabPath = "Assets/Prefabs/Board/[BlockSpawner].prefab";
 
-    [MenuItem("Tools/方块形状配置器/创建默认数据库并设为运行时使用", false, 241)]
+    [MenuItem("BlockPuzzle/方块形状配置器/创建默认数据库并设为运行时使用", false, 11)]
     public static void CreateDefaultAndSetRuntime()
     {
         var database = CreateDefaultDatabaseIfNeeded();

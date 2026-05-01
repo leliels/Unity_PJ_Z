@@ -35,6 +35,16 @@ namespace BlockPuzzle.Core
             }
         }
 
+        public static T Current => _instance;
+        public static bool HasInstance => _instance != null;
+        public static bool IsQuitting => _applicationIsQuitting;
+
+        public static bool TryGetInstance(out T instance)
+        {
+            instance = _instance;
+            return instance != null;
+        }
+
         protected virtual void Awake()
         {
             if (_instance == null)

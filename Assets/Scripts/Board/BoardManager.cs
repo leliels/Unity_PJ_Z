@@ -88,6 +88,8 @@ namespace BlockPuzzle.Board
         /// </summary>
         public void Init()
         {
+            ClearBoardVisuals();
+
             _grid = new bool[Constants.BoardCols, Constants.BoardRows];
             _cellColors = new Color[Constants.BoardCols, Constants.BoardRows];
             _cellRenderers = new SpriteRenderer[Constants.BoardCols, Constants.BoardRows];
@@ -105,10 +107,21 @@ namespace BlockPuzzle.Board
         /// </summary>
         public void ClearBoard()
         {
-            if (_boardScaleRoot != null)
-                Destroy(_boardScaleRoot.gameObject);
-
             Init();
+        }
+
+        private void ClearBoardVisuals()
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = transform.GetChild(i);
+                if (child == null || child.name != "BoardScaleRoot") continue;
+                child.gameObject.SetActive(false);
+                Destroy(child.gameObject);
+            }
+
+            _boardScaleRoot = null;
+            _boardContainer = null;
         }
 
         // ==================== 可视化 ====================

@@ -1,7 +1,11 @@
 using UnityEngine;
 using UnityEngine.UI;
+using BlockPuzzle.Audio;
 using BlockPuzzle.Board;
 using BlockPuzzle.Block;
+using BlockPuzzle.Feedback;
+using BlockPuzzle.Mode;
+using BlockPuzzle.Save;
 using BlockPuzzle.Score;
 using BlockPuzzle.UI;
 
@@ -149,6 +153,8 @@ namespace BlockPuzzle.Core
 
         private void CreateManagers()
         {
+            EnsureGlobalServices();
+
             // BoardManager：Prefab 上已包含 Cell/Preview Prefab 引用
             if (FindFirstObjectByType<BoardManager>() == null)
             {
@@ -200,6 +206,15 @@ namespace BlockPuzzle.Core
             }
         }
 
+        private void EnsureGlobalServices()
+        {
+            _ = SaveManager.Instance;
+            _ = ModeManager.Instance;
+            var audioManager = AudioManager.Instance;
+            _ = FeedbackManager.Instance;
+            audioManager?.PlayGameBgm();
+        }
+
         // ==================== 创建 UI ====================
 
         private void CreateUI()
@@ -222,7 +237,11 @@ namespace BlockPuzzle.Core
             {
                 var esGo = new GameObject("EventSystem");
                 esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
+#if ENABLE_INPUT_SYSTEM
                 esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+#else
+                esGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+#endif
             }
 
             // --- 分数显示（从 Prefab 实例化） ---
@@ -237,8 +256,15 @@ namespace BlockPuzzle.Core
             GameObject gameOverPanel = InstantiatePrefab(_gameOverPanelPrefab, canvasGo.transform, "GameOverPanel");
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
 
-            // --- 挂载 GameUI 脚本 ---
+            // --- 挂载 GameUI / 游戏内流程 UI 脚本 ---
             var gameUI = canvasGo.AddComponent<GameUI>();
+            canvasGo.AddComponent<GameFlowUI>();
+
+            if (FindFirstObjectByType<GameplayAudioBinder>() == null)
+            {
+                var binderGo = new GameObject("[GameplayAudioBinder]");
+                binderGo.AddComponent<GameplayAudioBinder>();
+            }
 
             SetPrivateField(gameUI, "_scoreDisplay", scoreDisplayGo?.GetComponent<NumberImageDisplay>());
             SetPrivateField(gameUI, "_highScoreDisplay", highScoreDisplayGo?.GetComponent<NumberImageDisplay>());
@@ -246,19 +272,7 @@ namespace BlockPuzzle.Core
             SetPrivateField(gameUI, "_finalScoreText", gameOverPanel?.transform.Find("FinalScoreText")?.GetComponent<Text>());
             SetPrivateField(gameUI, "_restartButton", gameOverPanel?.transform.Find("RestartButton")?.GetComponent<Button>());
 
-            // --- HUD 重新开始按钮 ---
-            if (_restartButtonPrefab != null)
-            {
-                var hudRestartGo = Instantiate(_restartButtonPrefab, canvasGo.transform, false);
-                hudRestartGo.name = "HudRestartButton";
-                var hudBtn = hudRestartGo.GetComponent<Button>();
-                if (hudBtn == null) hudBtn = hudRestartGo.AddComponent<Button>();
-                hudBtn.onClick.AddListener(() =>
-                {
-                    if (GameManager.Instance != null)
-                        GameManager.Instance.RestartGame();
-                });
-            }
+
 
             // --- 得分飘字管理器 ---
             var floatingMgr = canvasGo.AddComponent<FloatingScoreManager>();
