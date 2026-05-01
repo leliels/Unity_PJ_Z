@@ -8,29 +8,31 @@ namespace BlockPuzzle.Score
     public struct ScoreComboState
     {
         public int ComboCount;
-        public int ComboRewardChanceRemain;
+        public int ComboCooldownRemaining;
 
-        public void Reset()
+        public void Reset(ScoreConfig config)
         {
-            ComboCount = 0;
-            ComboRewardChanceRemain = 0;
+            ComboCount = config != null ? config.ComboInitialValue : 1;
+            ComboCooldownRemaining = config != null ? config.ComboCooldownDefault : 3;
         }
     }
 
     /// <summary>
-    /// 单次消除计分结果。
+    /// 单次计分结果。
     /// </summary>
     public struct ScoreCalculationResult
     {
         public int LineCount;
-        public int PlacementScore;
-        public int LineTierScore;
-        public long ClearBaseScore;
-        public long ComboBonusScore;
-        public int ComboCountUsedForBonus;
+        public int PlacedCellCount;
+        public int ClearBaseScore;
+        public int CellBaseScoreMultiplier;
+        public int LineScoreMultiplier;
+        public int ComboCountUsed;
+        public long CellScore;
+        public long ClearComboScore;
         public ScoreComboState ComboStateAfter;
 
-        public long TotalLineClearScore => ClearBaseScore + ComboBonusScore;
+        public long TotalScore => CellScore + ClearComboScore;
     }
 
     /// <summary>
@@ -40,87 +42,61 @@ namespace BlockPuzzle.Score
     {
         public static ScoreCalculationResult CalculateLineClear(
             int lineCount,
-            int placementScore,
+            int placedCellCount,
             ScoreComboState comboState,
             ScoreConfig config)
         {
             if (config == null)
                 throw new ArgumentNullException(nameof(config));
 
+            int safeLineCount = Math.Max(0, lineCount);
+            int safePlacedCellCount = Math.Max(0, placedCellCount);
+            ScoreComboState nextState = comboState;
+            if (nextState.ComboCount < config.ComboInitialValue)
+                nextState.ComboCount = config.ComboInitialValue;
+
             var result = new ScoreCalculationResult
             {
-                LineCount = Math.Max(0, lineCount),
-                PlacementScore = Math.Max(0, placementScore),
-                ComboStateAfter = comboState
+                LineCount = safeLineCount,
+                PlacedCellCount = safePlacedCellCount,
+                ComboStateAfter = nextState
             };
 
-            if (lineCount <= 0)
+            if (safeLineCount <= 0)
                 return result;
 
-            result.LineTierScore = config.GetLineTierScore(lineCount);
-            result.ClearBaseScore = (long)result.PlacementScore * result.LineTierScore;
+            result.ClearBaseScore = config.GetClearBaseScore();
+            result.CellBaseScoreMultiplier = config.CellBaseScoreMultiplier;
+            result.LineScoreMultiplier = config.GetLineScoreMultiplier(safeLineCount);
 
-            if (!config.EnableCombo)
-            {
-                result.ComboStateAfter.Reset();
-                return result;
-            }
+            int comboGain = safeLineCount * config.ComboGainPerClearedLine;
+            nextState.ComboCount += comboGain;
+            nextState.ComboCooldownRemaining = config.ComboCooldownDefault;
 
-            ScoreComboState nextState = comboState;
-            bool hasActiveRound = nextState.ComboCount > 0 || nextState.ComboRewardChanceRemain > 0;
-            int comboGain = lineCount * config.ComboGainPerClearedLine;
-
-            if (!hasActiveRound)
-            {
-                nextState.Reset();
-                nextState.ComboRewardChanceRemain = config.ComboRewardChanceLimit;
-
-                if (config.ComboAppliesOnFirstClear)
-                {
-                    nextState.ComboCount = comboGain;
-                    result.ComboCountUsedForBonus = nextState.ComboCount;
-                    TryApplyComboBonus(lineCount, result.ComboCountUsedForBonus, config, ref nextState, ref result);
-                }
-                else
-                {
-                    nextState.ComboCount += comboGain;
-                }
-            }
-            else
-            {
-                result.ComboCountUsedForBonus = nextState.ComboCount;
-                TryApplyComboBonus(lineCount, result.ComboCountUsedForBonus, config, ref nextState, ref result);
-                nextState.ComboCount += comboGain;
-            }
-
-            if (config.ComboChanceRecoverPerClear > 0 && config.ComboRewardChanceLimit > 0)
-            {
-                nextState.ComboRewardChanceRemain = Math.Min(
-                    config.ComboRewardChanceLimit,
-                    nextState.ComboRewardChanceRemain + config.ComboChanceRecoverPerClear);
-            }
-
-            if (nextState.ComboRewardChanceRemain <= 0)
-                nextState.Reset();
-
+            result.ComboCountUsed = nextState.ComboCount;
+            result.CellScore = (long)safePlacedCellCount * result.CellBaseScoreMultiplier * result.LineScoreMultiplier;
+            result.ClearComboScore = (long)result.ClearBaseScore * result.ComboCountUsed * safeLineCount * (safeLineCount + 1);
             result.ComboStateAfter = nextState;
             return result;
         }
 
-        private static void TryApplyComboBonus(
-            int lineCount,
-            int comboCountUsedForBonus,
-            ScoreConfig config,
-            ref ScoreComboState nextState,
-            ref ScoreCalculationResult result)
+        public static ScoreComboState CalculateNoClear(ScoreComboState comboState, ScoreConfig config)
         {
-            if (nextState.ComboRewardChanceRemain <= 0 || comboCountUsedForBonus <= 0)
-                return;
+            if (config == null)
+                throw new ArgumentNullException(nameof(config));
 
-            result.ComboBonusScore = lineCount * (long)config.ComboBonusFactor * comboCountUsedForBonus * (1 + lineCount);
-            nextState.ComboRewardChanceRemain = Math.Max(
-                0,
-                nextState.ComboRewardChanceRemain - config.ComboChanceCostPerTrigger);
+            ScoreComboState nextState = comboState;
+            if (nextState.ComboCount < config.ComboInitialValue)
+                nextState.ComboCount = config.ComboInitialValue;
+
+            nextState.ComboCooldownRemaining = Math.Max(0, nextState.ComboCooldownRemaining - 1);
+            if (nextState.ComboCooldownRemaining <= 0)
+            {
+                nextState.ComboCooldownRemaining = 0;
+                nextState.ComboCount = config.ComboInitialValue;
+            }
+
+            return nextState;
         }
     }
 }

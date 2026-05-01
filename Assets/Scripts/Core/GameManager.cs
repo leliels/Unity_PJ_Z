@@ -88,8 +88,8 @@ namespace BlockPuzzle.Core
             // 重置标记：等待消除事件
             _clearedThisTurn = false;
 
-            // 放置方块加分（每格 1 分）
-            ScoreManager.Instance.AddPlacementScore(cellCount);
+            // 普通放置不直接加分，只记录本次方块占格数 C
+            ScoreManager.Instance.RecordPlacedCells(cellCount);
         }
 
         private void HandleLinesCleared(int lineCount)
@@ -97,13 +97,13 @@ namespace BlockPuzzle.Core
             if (lineCount > 0)
             {
                 _clearedThisTurn = true;
-                // 消除加分（含 Combo 加成，由 ScoreManager 内部处理）
+                // 触发消除时按新版公式结算分数
                 ScoreManager.Instance.AddLineClearScore(lineCount);
             }
         }
 
         /// <summary>
-        /// 在方块放置并完成消除检测后调用，用于处理“未消除是否重置 Combo”的配置开关。
+        /// 在方块放置并完成消除检测后调用，用于处理未消除时的 CCD 递减。
         /// </summary>
         public void OnTurnComplete()
         {

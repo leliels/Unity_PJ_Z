@@ -10,69 +10,48 @@ namespace BlockPuzzle.Score
     {
         public const string ResourcesPath = "Configs/ScoreConfig";
 
-        [Header("基础计分")]
+        [Header("消除计分")]
         [SerializeField]
-        [InspectorName("每格放置分")]
-        [Tooltip("每个被方块占用的棋盘格，放置成功后立即获得多少分。")]
+        [InspectorName("消除基本分最小值")]
+        [Tooltip("B 的随机区间下限。默认与最大值相同，表示固定 20 分。")]
         [Min(0)]
-        private int _placementScorePerCell = 1;
+        private int _clearBaseScoreMin = 20;
 
         [SerializeField]
-        [InspectorName("排分表")]
-        [Tooltip("根据本次消除排数查表得到排分。例如消除 2 排使用第 2 档排分。")]
-        private int[] _lineTierScores = { 1, 3, 5, 7, 9 };
-
-        [SerializeField]
-        [InspectorName("超出排分递增值")]
-        [Tooltip("当消除排数超过排分表长度时，每多 1 排额外增加多少排分。默认 2 表示继续 1、3、5、7、9、11...。")]
+        [InspectorName("消除基本分最大值")]
+        [Tooltip("B 的随机区间上限。如需轻微随机，可配置为 21，并将最小值配置为 19。")]
         [Min(0)]
-        private int _extraLineTierStep = 2;
-
-        [Header("Combo 计分")]
-        [SerializeField]
-        [InspectorName("启用 Combo")]
-        [Tooltip("是否启用 Combo 连击加成；关闭后只计算放置分和消除基础加分。")]
-        private bool _enableCombo = true;
+        private int _clearBaseScoreMax = 20;
 
         [SerializeField]
-        [InspectorName("Combo 加成系数")]
-        [Tooltip("来自当前公式中的 20，用于控制 Combo 额外分整体强度。它不是 Combo 数，也不是奖励机会数。")]
+        [InspectorName("格子基础分倍率")]
+        [Tooltip("D，用于放大或缩小本次方块占格数 C 的贡献。")]
         [Min(0)]
-        private int _comboBonusFactor = 20;
+        private int _cellBaseScoreMultiplier = 1;
 
         [SerializeField]
-        [InspectorName("每轮 Combo 奖励机会数")]
-        [Tooltip("一轮 Combo 开启后，最多允许多少次后续消除获得 Combo 加成。")]
-        [Min(0)]
-        private int _comboRewardChanceLimit = 3;
+        [InspectorName("排分倍率表")]
+        [Tooltip("根据本次消除排数 L 查表得到 R。例如消除 2 排使用第 2 档倍率。")]
+        private int[] _lineScoreMultipliers = { 1, 3, 5, 7, 9 };
 
+        [Header("Combo")]
         [SerializeField]
-        [InspectorName("每次触发消耗机会数")]
-        [Tooltip("每次实际获得 Combo 加成后，从奖励机会数中扣除多少次。")]
+        [InspectorName("Combo 初始值/最小值")]
+        [Tooltip("M 的初始值和重置值。当前规则固定最小为 1。")]
         [Min(1)]
-        private int _comboChanceCostPerTrigger = 1;
+        private int _comboInitialValue = 1;
 
         [SerializeField]
-        [InspectorName("每次消除补充机会数")]
-        [Tooltip("每次消除后给奖励机会数补回多少；默认 0，表示不会越连越延长。")]
-        [Min(0)]
-        private int _comboChanceRecoverPerClear = 0;
-
-        [SerializeField]
-        [InspectorName("首次消除是否计算 Combo")]
-        [Tooltip("开启后，首次消除也会参与 Combo 加成；关闭时首次消除只开启 Combo 轮次。")]
-        private bool _comboAppliesOnFirstClear = false;
-
-        [SerializeField]
-        [InspectorName("每排 Combo 增长值")]
-        [Tooltip("每消除 1 排增加多少 Combo 数；消除 N 排时增加 N × 此值。")]
+        [InspectorName("Combo 增长值")]
+        [Tooltip("N，每消除 1 排增加多少 Combo 数；消除 L 排时增加 L × N。")]
         [Min(0)]
         private int _comboGainPerClearedLine = 1;
 
         [SerializeField]
-        [InspectorName("未消除是否重置 Combo")]
-        [Tooltip("放置方块但没有消除时，是否立即清空 Combo 数和奖励机会数。默认开启。")]
-        private bool _resetComboOnNoClear = true;
+        [InspectorName("Combo CD 默认值")]
+        [Tooltip("消除后 CCD 重置到该值；未消除时逐次递减，归零后 Combo 数重置为初始值。")]
+        [Min(0)]
+        private int _comboCooldownDefault = 3;
 
         [Header("安全限制")]
         [SerializeField]
@@ -81,31 +60,33 @@ namespace BlockPuzzle.Score
         [Min(1)]
         private int _maxScoreClamp = int.MaxValue;
 
-        public int PlacementScorePerCell => Mathf.Max(0, _placementScorePerCell);
-        public int ExtraLineTierStep => Mathf.Max(0, _extraLineTierStep);
-        public bool EnableCombo => _enableCombo;
-        public int ComboBonusFactor => Mathf.Max(0, _comboBonusFactor);
-        public int ComboRewardChanceLimit => Mathf.Max(0, _comboRewardChanceLimit);
-        public int ComboChanceCostPerTrigger => Mathf.Max(1, _comboChanceCostPerTrigger);
-        public int ComboChanceRecoverPerClear => Mathf.Max(0, _comboChanceRecoverPerClear);
-        public bool ComboAppliesOnFirstClear => _comboAppliesOnFirstClear;
+        public int ClearBaseScoreMin => Mathf.Max(0, _clearBaseScoreMin);
+        public int ClearBaseScoreMax => Mathf.Max(ClearBaseScoreMin, _clearBaseScoreMax);
+        public int CellBaseScoreMultiplier => Mathf.Max(0, _cellBaseScoreMultiplier);
+        public int ComboInitialValue => Mathf.Max(1, _comboInitialValue);
         public int ComboGainPerClearedLine => Mathf.Max(0, _comboGainPerClearedLine);
-        public bool ResetComboOnNoClear => _resetComboOnNoClear;
+        public int ComboCooldownDefault => Mathf.Max(0, _comboCooldownDefault);
         public int MaxScoreClamp => Mathf.Max(1, _maxScoreClamp);
 
-        public int GetLineTierScore(int lineCount)
+        public int GetClearBaseScore()
+        {
+            int min = ClearBaseScoreMin;
+            int max = ClearBaseScoreMax;
+            if (min == max) return min;
+            return Random.Range(min, max == int.MaxValue ? int.MaxValue : max + 1);
+        }
+
+        public int GetLineScoreMultiplier(int lineCount)
         {
             if (lineCount <= 0) return 0;
 
-            EnsureLineTierScores();
+            EnsureLineScoreMultipliers();
 
             int index = lineCount - 1;
-            if (index < _lineTierScores.Length)
-                return Mathf.Max(0, _lineTierScores[index]);
+            if (index < _lineScoreMultipliers.Length)
+                return Mathf.Max(0, _lineScoreMultipliers[index]);
 
-            int lastTier = Mathf.Max(0, _lineTierScores[_lineTierScores.Length - 1]);
-            int extraCount = index - _lineTierScores.Length + 1;
-            return lastTier + extraCount * ExtraLineTierStep;
+            return Mathf.Max(0, _lineScoreMultipliers[_lineScoreMultipliers.Length - 1]);
         }
 
         public static ScoreConfig CreateRuntimeDefault()
@@ -119,41 +100,36 @@ namespace BlockPuzzle.Score
 
         private void ResetToDefaults()
         {
-            _placementScorePerCell = 1;
-            _lineTierScores = new[] { 1, 3, 5, 7, 9 };
-            _extraLineTierStep = 2;
-            _enableCombo = true;
-            _comboBonusFactor = 20;
-            _comboRewardChanceLimit = 3;
-            _comboChanceCostPerTrigger = 1;
-            _comboChanceRecoverPerClear = 0;
-            _comboAppliesOnFirstClear = false;
+            _clearBaseScoreMin = 20;
+            _clearBaseScoreMax = 20;
+            _cellBaseScoreMultiplier = 1;
+            _lineScoreMultipliers = new[] { 1, 3, 5, 7, 9 };
+            _comboInitialValue = 1;
             _comboGainPerClearedLine = 1;
-            _resetComboOnNoClear = true;
+            _comboCooldownDefault = 3;
             _maxScoreClamp = int.MaxValue;
         }
 
-        private void EnsureLineTierScores()
+        private void EnsureLineScoreMultipliers()
         {
-            if (_lineTierScores == null || _lineTierScores.Length == 0)
-                _lineTierScores = new[] { 1, 3, 5, 7, 9 };
+            if (_lineScoreMultipliers == null || _lineScoreMultipliers.Length == 0)
+                _lineScoreMultipliers = new[] { 1, 3, 5, 7, 9 };
         }
 
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            EnsureLineTierScores();
+            EnsureLineScoreMultipliers();
 
-            _placementScorePerCell = Mathf.Max(0, _placementScorePerCell);
-            for (int i = 0; i < _lineTierScores.Length; i++)
-                _lineTierScores[i] = Mathf.Max(0, _lineTierScores[i]);
+            _clearBaseScoreMin = Mathf.Max(0, _clearBaseScoreMin);
+            _clearBaseScoreMax = Mathf.Max(_clearBaseScoreMin, _clearBaseScoreMax);
+            _cellBaseScoreMultiplier = Mathf.Max(0, _cellBaseScoreMultiplier);
+            for (int i = 0; i < _lineScoreMultipliers.Length; i++)
+                _lineScoreMultipliers[i] = Mathf.Max(0, _lineScoreMultipliers[i]);
 
-            _extraLineTierStep = Mathf.Max(0, _extraLineTierStep);
-            _comboBonusFactor = Mathf.Max(0, _comboBonusFactor);
-            _comboRewardChanceLimit = Mathf.Max(0, _comboRewardChanceLimit);
-            _comboChanceCostPerTrigger = Mathf.Max(1, _comboChanceCostPerTrigger);
-            _comboChanceRecoverPerClear = Mathf.Max(0, _comboChanceRecoverPerClear);
+            _comboInitialValue = Mathf.Max(1, _comboInitialValue);
             _comboGainPerClearedLine = Mathf.Max(0, _comboGainPerClearedLine);
+            _comboCooldownDefault = Mathf.Max(0, _comboCooldownDefault);
             _maxScoreClamp = Mathf.Max(1, _maxScoreClamp);
         }
 #endif

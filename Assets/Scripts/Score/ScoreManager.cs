@@ -15,7 +15,7 @@ namespace BlockPuzzle.Score
         /// <summary>Combo 变化事件（参数：当前 Combo 数）</summary>
         public event Action<int> OnComboChanged;
 
-        /// <summary>消除计分详情事件（参数：消除排数、消除基础加分、Combo 加成分、本次用于加成的 Combo 数）</summary>
+        /// <summary>消除计分详情事件（参数：消除排数、格子得分项、消除/Combo 得分项、本次使用的 Combo 数）</summary>
         public event Action<int, long, long, int> OnLineClearScoreDetail;
 
         /// <summary>最高分变化事件（参数：新的最高分）</summary>
@@ -38,14 +38,14 @@ namespace BlockPuzzle.Score
         public int HighScore => _highScore;
 
         private ScoreComboState _comboState;
-        /// <summary>当前 Combo 数（每轮结束或规则重置时归零）</summary>
+        /// <summary>当前 Combo 数，最小值由 ScoreConfig 决定，默认 1。</summary>
         public int ComboCount => _comboState.ComboCount;
-        /// <summary>当前轮剩余 Combo 奖励机会数</summary>
-        public int ComboRewardChanceRemain => _comboState.ComboRewardChanceRemain;
+        /// <summary>当前剩余 Combo CD。</summary>
+        public int ComboCooldownRemaining => _comboState.ComboCooldownRemaining;
 
-        /// <summary>本次放置的方块得分（供消除公式和飘字表现使用）</summary>
-        private int _lastPlacementScore;
-        public int LastPlacementScore => _lastPlacementScore;
+        /// <summary>本次成功放置的方块占格数 C。</summary>
+        private int _lastPlacedCellCount;
+        public int LastPlacedCellCount => _lastPlacedCellCount;
 
         public ScoreConfig Config
         {
@@ -78,8 +78,8 @@ namespace BlockPuzzle.Score
         public void ResetScore()
         {
             _score = 0;
-            _lastPlacementScore = 0;
-            _comboState.Reset();
+            _lastPlacedCellCount = 0;
+            _comboState.Reset(Config);
 
             // 首次或重置时从 PlayerPrefs 加载最高分
             if (_highScore == 0)
@@ -109,17 +109,15 @@ namespace BlockPuzzle.Score
         }
 
         /// <summary>
-        /// 放置方块加分，并记录本次放置得分供消除公式使用。
+        /// 记录本次成功放置方块的占格数 C。普通放置不直接加分。
         /// </summary>
-        public void AddPlacementScore(int cellCount)
+        public void RecordPlacedCells(int cellCount)
         {
-            _lastPlacementScore = Math.Max(0, cellCount) * Config.PlacementScorePerCell;
-            AddScore(_lastPlacementScore);
-            OnScoreChanged?.Invoke(_score);
+            _lastPlacedCellCount = Math.Max(0, cellCount);
         }
 
         /// <summary>
-        /// 消除行/列加分（排分制 + 可配置 Combo）。
+        /// 消除行/列加分。
         /// </summary>
         public void AddLineClearScore(int lineCount)
         {
@@ -131,52 +129,46 @@ namespace BlockPuzzle.Score
 
             ScoreCalculationResult result = ScoreCalculator.CalculateLineClear(
                 lineCount,
-                _lastPlacementScore,
+                _lastPlacedCellCount,
                 _comboState,
                 Config);
 
             _comboState = result.ComboStateAfter;
-            AddScore(result.TotalLineClearScore);
+            AddScore(result.TotalScore);
 
             Debug.Log($"[Score] 消除 {lineCount} 排 | " +
-                      $"B={_lastPlacementScore}×排分{result.LineTierScore}={result.ClearBaseScore} | " +
-                      $"Combo数={result.ComboCountUsedForBonus}, Combo加成={result.ComboBonusScore} | " +
-                      $"剩余奖励机会={_comboState.ComboRewardChanceRemain}");
+                      $"格子项={result.PlacedCellCount}×{result.CellBaseScoreMultiplier}×{result.LineScoreMultiplier}={result.CellScore} | " +
+                      $"消除/Combo项={result.ClearBaseScore}×{result.ComboCountUsed}×{result.LineCount}×{result.LineCount + 1}={result.ClearComboScore} | " +
+                      $"CCD={_comboState.ComboCooldownRemaining}");
 
-            // 发出详细事件供飘字系统使用
             OnLineClearScoreDetail?.Invoke(
                 lineCount,
-                result.ClearBaseScore,
-                result.ComboBonusScore,
-                result.ComboCountUsedForBonus);
+                result.CellScore,
+                result.ClearComboScore,
+                result.ComboCountUsed);
             OnComboChanged?.Invoke(_comboState.ComboCount);
             OnScoreChanged?.Invoke(_score);
         }
 
         /// <summary>
-        /// 本回合没有产生消除时调用。默认根据配置重置 Combo。
+        /// 本回合没有产生消除时调用：当前分不变，CCD 递减；CCD 归零时 Combo 数重置为初始值。
         /// </summary>
         public void OnTurnCompletedWithoutClear()
         {
-            if (Config.ResetComboOnNoClear)
-                ResetCombo();
-        }
+            int comboBefore = _comboState.ComboCount;
+            int cooldownBefore = _comboState.ComboCooldownRemaining;
+            _comboState = ScoreCalculator.CalculateNoClear(_comboState, Config);
 
-        /// <summary>
-        /// 重置 Combo。
-        /// </summary>
-        public void ResetCombo()
-        {
-            if (_comboState.ComboCount > 0 || _comboState.ComboRewardChanceRemain > 0)
-            {
-                _comboState.Reset();
+            if (comboBefore != _comboState.ComboCount)
                 OnComboChanged?.Invoke(_comboState.ComboCount);
-            }
+
+            if (cooldownBefore != _comboState.ComboCooldownRemaining || comboBefore != _comboState.ComboCount)
+                Debug.Log($"[Score] 未消除 | CCD={_comboState.ComboCooldownRemaining}, Combo={_comboState.ComboCount}");
         }
 
-        public int GetLineTierScore(int lineCount)
+        public int GetLineScoreMultiplier(int lineCount)
         {
-            return Config.GetLineTierScore(lineCount);
+            return Config.GetLineScoreMultiplier(lineCount);
         }
 
         private void AddScore(long amount)
@@ -207,4 +199,3 @@ namespace BlockPuzzle.Score
         }
     }
 }
-

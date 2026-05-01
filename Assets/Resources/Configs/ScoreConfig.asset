@@ -12,15 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d1ca36f55561c149b21a5f3de1d7e02, type: 3}
   m_Name: ScoreConfig
   m_EditorClassIdentifier: 
-  _placementScorePerCell: 1
-  _lineTierScores: 0100000003000000050000000700000009000000
-  _extraLineTierStep: 2
-  _enableCombo: 1
-  _comboBonusFactor: 20
-  _comboRewardChanceLimit: 3
-  _comboChanceCostPerTrigger: 1
-  _comboChanceRecoverPerClear: 0
-  _comboAppliesOnFirstClear: 0
+  _clearBaseScoreMin: 20
+  _clearBaseScoreMax: 20
+  _cellBaseScoreMultiplier: 1
+  _lineScoreMultipliers: 0100000003000000050000000700000009000000
+  _comboInitialValue: 1
   _comboGainPerClearedLine: 1
-  _resetComboOnNoClear: 1
+  _comboCooldownDefault: 3
   _maxScoreClamp: 2147483647

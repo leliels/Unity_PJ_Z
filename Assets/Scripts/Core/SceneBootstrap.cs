@@ -269,12 +269,10 @@ namespace BlockPuzzle.Core
             if (Score.ScoreManager.Instance != null)
             {
                 var scoreManager = Score.ScoreManager.Instance;
-                scoreManager.OnLineClearScoreDetail += (lineCount, baseScore, comboBonus, comboCount) =>
+                scoreManager.OnLineClearScoreDetail += (lineCount, cellScore, clearComboScore, comboCount) =>
                 {
-                    floatingMgr.EnqueuePlacementScore(scoreManager.LastPlacementScore);
-                    floatingMgr.EnqueueClearScore(baseScore, lineCount);
-                    if (comboBonus > 0)
-                        floatingMgr.EnqueueComboBonus(comboCount, comboBonus);
+                    floatingMgr.EnqueueCellScore(cellScore);
+                    floatingMgr.EnqueueClearComboScore(comboCount, clearComboScore);
                     floatingMgr.PlayAll();
                 };
 

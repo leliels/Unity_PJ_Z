@@ -3,30 +3,19 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using BlockPuzzle.Core;
-using BlockPuzzle.Score;
-
 
 namespace BlockPuzzle.UI
 {
     /// <summary>
     /// 消除得分飘字管理器：
-    /// 消除发生时逐条展示每项得分（放置分、消除基础加分、Combo 加成），
+    /// 消除发生时逐条展示新版计分项（格子得分项、消除/Combo 得分项），
     /// 播完后触发总分跳动效果。
-    ///
-    /// 流程：
-    /// ① 显示放置分飘字（如 "+4"）
-    /// ② 显示消除基础加分飘字（如 "+12"）
-    /// ③ 如果有 Combo → 显示 Combo 加成飘字（如 "Combo ×2 +240"）
-    /// ④ 所有飘字展示完毕后 → 触发 OnAllFinished 回调 → 总分跳动
-
     /// </summary>
     public class FloatingScoreManager : MonoBehaviour
     {
         private Canvas _canvas;
         private RectTransform _canvasRect;
 
-        // --- Prefab 和可配置参数（Inspector 可调） ---
         [Header("飘字 Prefab（可选，需含 Text + Outline 组件）")]
         [Tooltip("飘字 Prefab。为空时代码创建 fallback。可在 Prefab 中调整字体、字号、描边等。")]
         [SerializeField] private GameObject _floatingScorePrefab;
@@ -41,15 +30,11 @@ namespace BlockPuzzle.UI
         [Tooltip("飘字起始锚点位置（屏幕比例，0.65=偏上）")]
         [SerializeField] private Vector2 _spawnAnchor = new Vector2(0.5f, 0.65f);
 
-        // fallback 字号（仅在无 Prefab 时使用）
         private const int FallbackFontSize = 52;
 
-        // 颜色
-        private static readonly Color PlacementColor = Color.white;
-        private static readonly Color ClearColor = new Color(1f, 0.85f, 0.2f, 1f);  // 金色
-        private static readonly Color ComboColor = new Color(0.4f, 1f, 0.6f, 1f);   // 绿色
+        private static readonly Color CellScoreColor = Color.white;
+        private static readonly Color ClearComboScoreColor = new Color(0.4f, 1f, 0.6f, 1f);
 
-        // 待显示的飘字队列
         private Queue<FloatEntry> _pendingEntries = new Queue<FloatEntry>();
         private bool _isPlaying;
 
@@ -72,52 +57,41 @@ namespace BlockPuzzle.UI
         }
 
         /// <summary>外部设置飘字 Prefab</summary>
-        public void SetFloatingScorePrefab(GameObject prefab) { if (_floatingScorePrefab == null) _floatingScorePrefab = prefab; }
+        public void SetFloatingScorePrefab(GameObject prefab)
+        {
+            if (_floatingScorePrefab == null)
+                _floatingScorePrefab = prefab;
+        }
 
         /// <summary>
-        /// 添加放置分飘字。
+        /// 添加格子得分项飘字。
         /// </summary>
-        public void EnqueuePlacementScore(int placementScore)
+        public void EnqueueCellScore(long score)
         {
-            if (placementScore <= 0) return;
+            if (score <= 0) return;
             _pendingEntries.Enqueue(new FloatEntry
             {
-                text = $"+{placementScore}",
-                color = PlacementColor
+                text = $"+{score}",
+                color = CellScoreColor
             });
         }
 
-
         /// <summary>
-        /// 添加消除分飘字（单行/列的分数）
+        /// 添加消除/Combo 得分项飘字。
         /// </summary>
-        public void EnqueueClearScore(long score, int lineCount)
+        public void EnqueueClearComboScore(int comboCount, long score)
         {
             if (score <= 0) return;
-            string label = lineCount > 1 ? $"×{lineCount} +{score}" : $"+{score}";
+            string label = comboCount > 0 ? $"Combo ×{comboCount} +{score}" : $"+{score}";
             _pendingEntries.Enqueue(new FloatEntry
             {
                 text = label,
-                color = ClearColor
+                color = ClearComboScoreColor
             });
         }
 
         /// <summary>
-        /// 添加 Combo 加成飘字。
-        /// </summary>
-        public void EnqueueComboBonus(int comboCount, long bonusScore)
-        {
-            if (comboCount <= 0 || bonusScore <= 0) return;
-            _pendingEntries.Enqueue(new FloatEntry
-            {
-                text = $"Combo ×{comboCount} +{bonusScore}",
-                color = ComboColor
-            });
-        }
-
-
-        /// <summary>
-        /// 开始播放所有待显示的飘字
+        /// 开始播放所有待显示的飘字。
         /// </summary>
         public void PlayAll()
         {
@@ -138,12 +112,9 @@ namespace BlockPuzzle.UI
                 yield return new WaitForSeconds(_staggerDelay);
             }
 
-            // 等待最后一条飘字的动画播完（上飘 + 淡出）
             yield return new WaitForSeconds(_floatDuration);
 
             _isPlaying = false;
-
-            // 通知所有飘字已播放完毕 → 触发总分跳动
             OnAllFinished?.Invoke();
         }
 
@@ -157,7 +128,6 @@ namespace BlockPuzzle.UI
 
             if (_floatingScorePrefab != null)
             {
-                // Prefab 方式：字体、字号、描边等由 Prefab 决定
                 go = Instantiate(_floatingScorePrefab, _canvas.transform, false);
                 go.name = "FloatingScore";
                 rect = go.GetComponent<RectTransform>();
@@ -167,7 +137,6 @@ namespace BlockPuzzle.UI
             }
             else
             {
-                // Fallback：代码创建
                 go = new GameObject("FloatingScore");
                 go.transform.SetParent(_canvas.transform, false);
                 rect = go.AddComponent<RectTransform>();
@@ -187,13 +156,11 @@ namespace BlockPuzzle.UI
                 outline.effectDistance = new Vector2(2, -2);
             }
 
-            // 设置位置（使用可配置的锚点）
             rect.anchorMin = _spawnAnchor;
             rect.anchorMax = _spawnAnchor;
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = new Vector2(0f, yOffset);
 
-            // 设置文字和颜色（无论 Prefab 还是 fallback 都由代码控制）
             txt.text = text;
             txt.color = color;
 
@@ -206,11 +173,9 @@ namespace BlockPuzzle.UI
             Vector2 endPos = startPos + new Vector2(0f, _floatDistance);
             Color startColor = txt.color;
 
-            // 弹出动画：从 0.5 倍缩放到 1.2 倍再回到 1.0 倍
             float popDuration = 0.15f;
             float elapsed = 0f;
 
-            // 弹出阶段
             while (elapsed < popDuration)
             {
                 elapsed += Time.deltaTime;
@@ -220,7 +185,6 @@ namespace BlockPuzzle.UI
                 yield return null;
             }
 
-            // 回弹
             elapsed = 0f;
             while (elapsed < 0.1f)
             {
@@ -232,10 +196,8 @@ namespace BlockPuzzle.UI
             }
             rect.localScale = Vector3.one;
 
-            // 上飘 + 淡出阶段
             elapsed = 0f;
             float fadeDuration = _floatDuration - 0.25f;
-            // 先停留一会
             yield return new WaitForSeconds(0.3f);
 
             while (elapsed < fadeDuration)
@@ -243,10 +205,8 @@ namespace BlockPuzzle.UI
                 elapsed += Time.deltaTime;
                 float t = elapsed / fadeDuration;
 
-                // 上飘
                 rect.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
 
-                // 后半段淡出
                 if (t > 0.5f)
                 {
                     float fadeT = (t - 0.5f) / 0.5f;
