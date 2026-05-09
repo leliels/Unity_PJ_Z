@@ -10,6 +10,13 @@ namespace BlockPuzzle.Score
     {
         public const string ResourcesPath = "Configs/ScoreConfig";
 
+        [Header("放置计分")]
+        [SerializeField]
+        [InspectorName("放置每格基础分")]
+        [Tooltip("方块放下时，每个格子获得的基础分数。0 表示放置不加分。")]
+        [Min(0)]
+        private int _placeScorePerCell = 1;
+
         [Header("消除计分")]
         [SerializeField]
         [InspectorName("消除基本分最小值")]
@@ -36,10 +43,10 @@ namespace BlockPuzzle.Score
 
         [Header("Combo")]
         [SerializeField]
-        [InspectorName("Combo 初始值/最小值")]
-        [Tooltip("M 的初始值和重置值。当前规则固定最小为 1。")]
-        [Min(1)]
-        private int _comboInitialValue = 1;
+        [InspectorName("Combo 初始值/重置值")]
+        [Tooltip("M 的初始值和 CCD 归零后的重置值。0 表示开局无 Combo 加成，消除后才开始累积。")]
+        [Min(0)]
+        private int _comboInitialValue = 0;
 
         [SerializeField]
         [InspectorName("Combo 增长值")]
@@ -60,10 +67,11 @@ namespace BlockPuzzle.Score
         [Min(1)]
         private int _maxScoreClamp = int.MaxValue;
 
+        public int PlaceScorePerCell => Mathf.Max(0, _placeScorePerCell);
         public int ClearBaseScoreMin => Mathf.Max(0, _clearBaseScoreMin);
         public int ClearBaseScoreMax => Mathf.Max(ClearBaseScoreMin, _clearBaseScoreMax);
         public int CellBaseScoreMultiplier => Mathf.Max(0, _cellBaseScoreMultiplier);
-        public int ComboInitialValue => Mathf.Max(1, _comboInitialValue);
+        public int ComboInitialValue => Mathf.Max(0, _comboInitialValue);
         public int ComboGainPerClearedLine => Mathf.Max(0, _comboGainPerClearedLine);
         public int ComboCooldownDefault => Mathf.Max(0, _comboCooldownDefault);
         public int MaxScoreClamp => Mathf.Max(1, _maxScoreClamp);
@@ -100,11 +108,12 @@ namespace BlockPuzzle.Score
 
         private void ResetToDefaults()
         {
+            _placeScorePerCell = 1;
             _clearBaseScoreMin = 20;
             _clearBaseScoreMax = 20;
             _cellBaseScoreMultiplier = 1;
             _lineScoreMultipliers = new[] { 1, 3, 5, 7, 9 };
-            _comboInitialValue = 1;
+            _comboInitialValue = 0;
             _comboGainPerClearedLine = 1;
             _comboCooldownDefault = 3;
             _maxScoreClamp = int.MaxValue;
@@ -121,13 +130,14 @@ namespace BlockPuzzle.Score
         {
             EnsureLineScoreMultipliers();
 
+            _placeScorePerCell = Mathf.Max(0, _placeScorePerCell);
             _clearBaseScoreMin = Mathf.Max(0, _clearBaseScoreMin);
             _clearBaseScoreMax = Mathf.Max(_clearBaseScoreMin, _clearBaseScoreMax);
             _cellBaseScoreMultiplier = Mathf.Max(0, _cellBaseScoreMultiplier);
             for (int i = 0; i < _lineScoreMultipliers.Length; i++)
                 _lineScoreMultipliers[i] = Mathf.Max(0, _lineScoreMultipliers[i]);
 
-            _comboInitialValue = Mathf.Max(1, _comboInitialValue);
+            _comboInitialValue = Mathf.Max(0, _comboInitialValue);
             _comboGainPerClearedLine = Mathf.Max(0, _comboGainPerClearedLine);
             _comboCooldownDefault = Mathf.Max(0, _comboCooldownDefault);
             _maxScoreClamp = Mathf.Max(1, _maxScoreClamp);

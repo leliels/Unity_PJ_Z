@@ -12,7 +12,7 @@ namespace BlockPuzzle.Score
 
         public void Reset(ScoreConfig config)
         {
-            ComboCount = config != null ? config.ComboInitialValue : 1;
+            ComboCount = config != null ? config.ComboInitialValue : 0;
             ComboCooldownRemaining = config != null ? config.ComboCooldownDefault : 3;
         }
     }
@@ -70,10 +70,22 @@ namespace BlockPuzzle.Score
             result.LineScoreMultiplier = config.GetLineScoreMultiplier(safeLineCount);
 
             int comboGain = safeLineCount * config.ComboGainPerClearedLine;
-            nextState.ComboCount += comboGain;
-            nextState.ComboCooldownRemaining = config.ComboCooldownDefault;
 
-            result.ComboCountUsed = nextState.ComboCount;
+            if (nextState.ComboCount == 0)
+            {
+                // 首次消除（M=0）：不产生 Combo，倍率固定为 1
+                // M 设为 1 仅标记"已消除过"，供后续消除判定
+                nextState.ComboCount = 1;
+                result.ComboCountUsed = 1;
+            }
+            else
+            {
+                // 后续消除（M>0）：Combo = 当前M + 本次消除排数×增长值
+                nextState.ComboCount += comboGain;
+                result.ComboCountUsed = nextState.ComboCount;
+            }
+
+            nextState.ComboCooldownRemaining = config.ComboCooldownDefault;
             result.CellScore = (long)safePlacedCellCount * result.CellBaseScoreMultiplier * result.LineScoreMultiplier;
             result.ClearComboScore = (long)result.ClearBaseScore * result.ComboCountUsed * safeLineCount * (safeLineCount + 1);
             result.ComboStateAfter = nextState;

@@ -20,6 +20,9 @@ namespace BlockPuzzle.Score
         /// <summary>消除计分详情事件（参数：消除排数、格子得分项、消除/Combo 得分项、本次使用的 Combo 数）</summary>
         public event Action<int, long, long, int> OnLineClearScoreDetail;
 
+        /// <summary>放置计分事件（参数：放置得分）</summary>
+        public event Action<long> OnPlaceScore;
+
         /// <summary>最高分变化事件（参数：新的最高分）</summary>
         public event Action<int> OnHighScoreChanged;
 
@@ -115,7 +118,9 @@ namespace BlockPuzzle.Score
         }
 
         /// <summary>
-        /// 记录本次成功放置方块的占格数 C。普通放置不直接加分。
+        /// 记录本次成功放置方块的占格数 C。
+        /// 放置分不在此处立即结算——若本回合触发消除，C 已包含在消除公式中；
+        /// 若未触发消除，则在 OnTurnCompletedWithoutClear 中结算放置分。
         /// </summary>
         public void RecordPlacedCells(int cellCount)
         {
@@ -157,10 +162,21 @@ namespace BlockPuzzle.Score
         }
 
         /// <summary>
-        /// 本回合没有产生消除时调用：当前分不变，CCD 递减；CCD 归零时 Combo 数重置为初始值。
+        /// 本回合没有产生消除时调用：结算放置分，CCD 递减；CCD 归零时 Combo 数重置为初始值。
         /// </summary>
         public void OnTurnCompletedWithoutClear()
         {
+            // 无消除时结算放置分
+            int scorePerCell = Config.PlaceScorePerCell;
+            if (scorePerCell > 0 && _lastPlacedCellCount > 0)
+            {
+                long placeScore = (long)_lastPlacedCellCount * scorePerCell;
+                AddScore(placeScore);
+                Debug.Log($"[Score] 放置（未消除）{_lastPlacedCellCount} 格 × {scorePerCell} = +{placeScore}");
+                OnPlaceScore?.Invoke(placeScore);
+                OnScoreChanged?.Invoke(_score);
+            }
+
             int comboBefore = _comboState.ComboCount;
             int cooldownBefore = _comboState.ComboCooldownRemaining;
             _comboState = ScoreCalculator.CalculateNoClear(_comboState, Config);

@@ -82,7 +82,8 @@ namespace BlockPuzzle.UI
         public void EnqueueClearComboScore(int comboCount, long score)
         {
             if (score <= 0) return;
-            string label = comboCount > 0 ? $"Combo ×{comboCount} +{score}" : $"+{score}";
+            // 只有 Combo > 1（即连续消除）时才显示 "Combo ×N" 格式
+            string label = comboCount > 1 ? $"Combo ×{comboCount} +{score}" : $"+{score}";
             _pendingEntries.Enqueue(new FloatEntry
             {
                 text = label,

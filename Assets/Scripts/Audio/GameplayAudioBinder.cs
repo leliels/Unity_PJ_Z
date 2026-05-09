@@ -87,8 +87,9 @@ namespace BlockPuzzle.Audio
         private void HandleLinesCleared(int lineCount)
         {
             Play(_clearLineCue, AudioCueId.ClearLine);
-            if (FeedbackManager.Current != null)
-                FeedbackManager.Current.PlayMedium();
+            // 消除震动暂时关闭（2026-05-09）
+            // if (FeedbackManager.Current != null)
+            //     FeedbackManager.Current.PlayMedium();
         }
 
         private void HandleLineClearScoreDetail(int lineCount, long cellScore, long clearComboScore, int comboCount)
