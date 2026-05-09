@@ -97,6 +97,15 @@ namespace BlockPuzzle.UI
             UpdateScoreDisplay(currentScore);
         }
 
+        /// <summary>
+        /// 播放总分数字跳动效果（飘字播放完毕后由 FloatingScoreManager 调用）。
+        /// </summary>
+        public void PlayScoreBounce()
+        {
+            if (_scoreDisplay != null)
+                _scoreDisplay.PlayBounceEffect();
+        }
+
         private void HandleGameStateChanged(GameState state)
         {
             if (state == GameState.GameOver)

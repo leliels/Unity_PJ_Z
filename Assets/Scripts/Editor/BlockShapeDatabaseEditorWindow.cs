@@ -21,7 +21,7 @@ public sealed class BlockShapeDatabaseEditorWindow : EditorWindow
     private Vector2 _editScroll;
     private Vector2 _browseScroll;
 
-    [MenuItem("BlockPuzzle/方块形状配置器", false, 10)]
+    [MenuItem("BlockPuzzle/方块形状配置器/配置器窗口", false, 10)]
     public static void Open()
     {
         var window = GetWindow<BlockShapeDatabaseEditorWindow>();

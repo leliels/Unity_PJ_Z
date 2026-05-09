@@ -7,8 +7,10 @@ using UnityEngine.UI;
 namespace BlockPuzzle.UI
 {
     /// <summary>
-    /// 消除得分飘字管理器：
-    /// 消除发生时逐条展示新版计分项（格子得分项、消除/Combo 得分项），
+    /// 消除得分飘字管理器（重构版）：
+    /// 支持结构化飘字（ScorePopupView Prefab）和旧版纯文本 fallback。
+    /// 消除时展示 Combo + 格子加成分 + 消除Combo分 三模块组合；
+    /// 非消除放置时展示单独放置分飘字。
     /// 播完后触发总分跳动效果。
     /// </summary>
     public class FloatingScoreManager : MonoBehaviour
@@ -16,11 +18,15 @@ namespace BlockPuzzle.UI
         private Canvas _canvas;
         private RectTransform _canvasRect;
 
-        [Header("飘字 Prefab（可选，需含 Text + Outline 组件）")]
-        [Tooltip("飘字 Prefab。为空时代码创建 fallback。可在 Prefab 中调整字体、字号、描边等。")]
+        [Header("新版组合飘字 Prefab（需含 ScorePopupView 组件）")]
+        [Tooltip("新版组合飘字 Prefab。为空时使用旧版纯文本 fallback。")]
+        [SerializeField] private GameObject _scorePopupPrefab;
+
+        [Header("旧版飘字 Prefab（fallback，需含 Text + Outline 组件）")]
+        [Tooltip("旧版飘字 Prefab。新版 Prefab 未配置时使用此 fallback。")]
         [SerializeField] private GameObject _floatingScorePrefab;
 
-        [Header("飘字动画配置")]
+        [Header("飘字动画配置（旧版 fallback 用）")]
         [Tooltip("飘字总持续时间（秒）")]
         [SerializeField] private float _floatDuration = 1.2f;
         [Tooltip("向上飘动像素距离")]
@@ -34,18 +40,39 @@ namespace BlockPuzzle.UI
 
         private static readonly Color CellScoreColor = Color.white;
         private static readonly Color ClearComboScoreColor = new Color(0.4f, 1f, 0.6f, 1f);
-
-        private Queue<FloatEntry> _pendingEntries = new Queue<FloatEntry>();
-        private bool _isPlaying;
+        private static readonly Color PlaceScoreColor = new Color(1f, 0.95f, 0.7f, 1f);
 
         /// <summary>所有飘字播放完毕事件</summary>
         public event Action OnAllFinished;
+
+        // ==================== 结构化条目 ====================
+
+        private enum PopupType { ClearScore, PlaceScore }
+
+        private struct PopupEntry
+        {
+            public PopupType type;
+            // 消除场景
+            public int comboCount;
+            public long cellScore;
+            public long clearComboScore;
+            // 放置场景
+            public long placeScore;
+        }
+
+        private Queue<PopupEntry> _pendingEntries = new Queue<PopupEntry>();
+        private bool _isPlaying;
+
+        // ==================== 旧版 fallback 队列 ====================
 
         private struct FloatEntry
         {
             public string text;
             public Color color;
         }
+        private Queue<FloatEntry> _pendingLegacyEntries = new Queue<FloatEntry>();
+
+        // ==================== 初始化 ====================
 
         /// <summary>
         /// 初始化，绑定到指定 Canvas
@@ -56,20 +83,58 @@ namespace BlockPuzzle.UI
             _canvasRect = canvas.GetComponent<RectTransform>();
         }
 
-        /// <summary>外部设置飘字 Prefab</summary>
+        /// <summary>外部设置旧版飘字 Prefab（兼容 SceneBootstrap 旧调用）</summary>
         public void SetFloatingScorePrefab(GameObject prefab)
         {
             if (_floatingScorePrefab == null)
                 _floatingScorePrefab = prefab;
         }
 
+        /// <summary>外部设置新版组合飘字 Prefab</summary>
+        public void SetScorePopupPrefab(GameObject prefab)
+        {
+            if (_scorePopupPrefab == null)
+                _scorePopupPrefab = prefab;
+        }
+
+        // ==================== 新版结构化入队 ====================
+
         /// <summary>
-        /// 添加格子得分项飘字。
+        /// 消除得分：将 Combo + 格子加成分 + 消除Combo分 作为一个组合飘字条目入队。
+        /// </summary>
+        public void EnqueueClearScore(int comboCount, long cellScore, long clearComboScore)
+        {
+            _pendingEntries.Enqueue(new PopupEntry
+            {
+                type = PopupType.ClearScore,
+                comboCount = comboCount,
+                cellScore = cellScore,
+                clearComboScore = clearComboScore
+            });
+        }
+
+        /// <summary>
+        /// 非消除放置得分：单独放置分飘字入队。
+        /// </summary>
+        public void EnqueuePlaceScore(long placeScore)
+        {
+            if (placeScore <= 0) return;
+            _pendingEntries.Enqueue(new PopupEntry
+            {
+                type = PopupType.PlaceScore,
+                placeScore = placeScore
+            });
+        }
+
+        // ==================== 旧版兼容入队（保留以支持未绑定新 Prefab 时的 fallback） ====================
+
+        /// <summary>
+        /// [旧版兼容] 添加格子得分项飘字。
         /// </summary>
         public void EnqueueCellScore(long score)
         {
             if (score <= 0) return;
-            _pendingEntries.Enqueue(new FloatEntry
+            _pendingLegacyEntries.Enqueue(new FloatEntry
             {
                 text = $"+{score}",
                 color = CellScoreColor
@@ -77,37 +142,151 @@ namespace BlockPuzzle.UI
         }
 
         /// <summary>
-        /// 添加消除/Combo 得分项飘字。
+        /// [旧版兼容] 添加消除/Combo 得分项飘字。
         /// </summary>
         public void EnqueueClearComboScore(int comboCount, long score)
         {
             if (score <= 0) return;
-            // 只有 Combo > 1（即连续消除）时才显示 "Combo ×N" 格式
             string label = comboCount > 1 ? $"Combo ×{comboCount} +{score}" : $"+{score}";
-            _pendingEntries.Enqueue(new FloatEntry
+            _pendingLegacyEntries.Enqueue(new FloatEntry
             {
                 text = label,
                 color = ClearComboScoreColor
             });
         }
 
+        // ==================== 播放 ====================
+
         /// <summary>
         /// 开始播放所有待显示的飘字。
         /// </summary>
         public void PlayAll()
         {
-            if (_pendingEntries.Count == 0 || _isPlaying) return;
-            StartCoroutine(PlaySequence());
+            if (_isPlaying) return;
+
+            // 优先使用新版结构化队列
+            if (_pendingEntries.Count > 0)
+            {
+                StartCoroutine(PlayNewSequence());
+            }
+            else if (_pendingLegacyEntries.Count > 0)
+            {
+                StartCoroutine(PlayLegacySequence());
+            }
         }
 
-        private IEnumerator PlaySequence()
+        // ==================== 新版播放逻辑 ====================
+
+        private IEnumerator PlayNewSequence()
         {
             _isPlaying = true;
-            float yOffset = 0f;
+            int spawnedCount = 0;
+            int finishedCount = 0;
 
             while (_pendingEntries.Count > 0)
             {
                 var entry = _pendingEntries.Dequeue();
+                spawnedCount++;
+
+                if (_scorePopupPrefab != null)
+                {
+                    SpawnScorePopup(entry, () => { finishedCount++; });
+                }
+                else
+                {
+                    // Fallback：用旧版方式显示
+                    SpawnLegacyFromEntry(entry);
+                }
+
+                if (_pendingEntries.Count > 0)
+                    yield return new WaitForSeconds(_staggerDelay);
+            }
+
+            if (_scorePopupPrefab != null)
+            {
+                // 等待所有 popup 动画完成
+                while (finishedCount < spawnedCount)
+                    yield return null;
+            }
+            else
+            {
+                // 旧版等待固定时间
+                yield return new WaitForSeconds(_floatDuration);
+            }
+
+            _isPlaying = false;
+            OnAllFinished?.Invoke();
+        }
+
+        private void SpawnScorePopup(PopupEntry entry, Action onFinished)
+        {
+            if (_canvas == null) return;
+
+            var go = Instantiate(_scorePopupPrefab, _canvas.transform, false);
+            go.name = "ScorePopup";
+
+            var rect = go.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchorMin = _spawnAnchor;
+                rect.anchorMax = _spawnAnchor;
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = Vector2.zero;
+            }
+
+            var view = go.GetComponent<ScorePopupView>();
+            if (view != null)
+            {
+                switch (entry.type)
+                {
+                    case PopupType.ClearScore:
+                        view.SetClearScoreData(entry.comboCount, entry.cellScore, entry.clearComboScore);
+                        break;
+                    case PopupType.PlaceScore:
+                        view.SetPlaceScoreData(entry.placeScore);
+                        break;
+                }
+
+                view.OnFinished += onFinished;
+                view.PlayAnimation();
+            }
+            else
+            {
+                // Prefab 没挂 ScorePopupView，fallback 销毁
+                Debug.LogWarning("[FloatingScoreManager] ScorePopup Prefab 未挂载 ScorePopupView 组件");
+                Destroy(go);
+                onFinished?.Invoke();
+            }
+        }
+
+        private void SpawnLegacyFromEntry(PopupEntry entry)
+        {
+            switch (entry.type)
+            {
+                case PopupType.ClearScore:
+                    if (entry.cellScore > 0)
+                        SpawnFloatingText($"+{entry.cellScore}", CellScoreColor, 0f);
+                    string comboLabel = entry.comboCount > 1
+                        ? $"Combo ×{entry.comboCount} +{entry.clearComboScore}"
+                        : $"+{entry.clearComboScore}";
+                    SpawnFloatingText(comboLabel, ClearComboScoreColor, 60f);
+                    break;
+                case PopupType.PlaceScore:
+                    SpawnFloatingText($"+{entry.placeScore}", PlaceScoreColor, 0f);
+                    break;
+            }
+        }
+
+        // ==================== 旧版播放逻辑 ====================
+
+        private IEnumerator PlayLegacySequence()
+        {
+            _isPlaying = true;
+            float yOffset = 0f;
+
+            while (_pendingLegacyEntries.Count > 0)
+            {
+                var entry = _pendingLegacyEntries.Dequeue();
                 SpawnFloatingText(entry.text, entry.color, yOffset);
                 yOffset += 60f;
                 yield return new WaitForSeconds(_staggerDelay);
@@ -118,6 +297,8 @@ namespace BlockPuzzle.UI
             _isPlaying = false;
             OnAllFinished?.Invoke();
         }
+
+        // ==================== 旧版飘字生成 ====================
 
         private void SpawnFloatingText(string text, Color color, float yOffset)
         {

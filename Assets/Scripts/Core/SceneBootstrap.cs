@@ -39,8 +39,11 @@ namespace BlockPuzzle.Core
         [Tooltip("GameOver 面板 Prefab（含 FinalScoreText + RestartButton）")]
         [SerializeField] private GameObject _gameOverPanelPrefab;
 
-        [Tooltip("飘字 Prefab（需含 Text + Outline 组件）")]
+        [Tooltip("旧版飘字 Prefab（需含 Text + Outline 组件，新版为空时 fallback）")]
         [SerializeField] private GameObject _floatingScorePrefab;
+
+        [Tooltip("新版组合飘字 Prefab（需含 ScorePopupView 组件）")]
+        [SerializeField] private GameObject _scorePopupPrefab;
 
         [Tooltip("重新开始按钮 Prefab（HUD 左上角）")]
         [SerializeField] private GameObject _restartButtonPrefab;
@@ -278,29 +281,31 @@ namespace BlockPuzzle.Core
             var floatingMgr = canvasGo.AddComponent<FloatingScoreManager>();
             floatingMgr.Init(canvas);
             floatingMgr.SetFloatingScorePrefab(_floatingScorePrefab);
+            floatingMgr.SetScorePopupPrefab(_scorePopupPrefab);
 
-            // 监听消除计分事件，驱动飘字
+            // 监听计分事件，驱动飘字
             if (Score.ScoreManager.Instance != null)
             {
                 var scoreManager = Score.ScoreManager.Instance;
+
+                // 消除得分：使用新版结构化入队
                 scoreManager.OnLineClearScoreDetail += (lineCount, cellScore, clearComboScore, comboCount) =>
                 {
-                    floatingMgr.EnqueueCellScore(cellScore);
-                    floatingMgr.EnqueueClearComboScore(comboCount, clearComboScore);
+                    floatingMgr.EnqueueClearScore(comboCount, cellScore, clearComboScore);
                     floatingMgr.PlayAll();
                 };
 
+                // 非消除放置得分
+                scoreManager.OnPlaceScore += (placeScore) =>
+                {
+                    floatingMgr.EnqueuePlaceScore(placeScore);
+                    floatingMgr.PlayAll();
+                };
 
+                // 飘字播完后触发总分跳动（不再使用反射）
                 floatingMgr.OnAllFinished += () =>
                 {
-                    var ui = FindFirstObjectByType<GameUI>();
-                    if (ui != null)
-                    {
-                        var scoreField = typeof(GameUI).GetField("_scoreDisplay",
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        var display = scoreField?.GetValue(ui) as NumberImageDisplay;
-                        display?.PlayBounceEffect();
-                    }
+                    gameUI.PlayScoreBounce();
                 };
             }
         }
