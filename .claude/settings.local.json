@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \":*)",
+      "Bash(bash diagnose-skills.sh)",
+      "Bash(\"D:\\\\Program Files\\\\ffmpeg-8.1-essentials_build\\\\bin\\\\ffmpeg.exe\" -version)"
+    ],
+    "defaultMode": "bypassPermissions"
+  },
+  "outputStyle": "default"
+}
