@@ -112,6 +112,8 @@ namespace BlockPuzzle.Score
                 }
                 Debug.Log($"[Score] 新最高分: {_highScore}");
                 OnHighScoreChanged?.Invoke(_highScore);
+                BlockPuzzle.Core.GameplayEvents.Raise(BlockPuzzle.Core.GameplayEventId.NewHighScore,
+                    BlockPuzzle.Core.GameplayEventArgs.WithScore(_highScore));
                 return true;
             }
             return false;
@@ -157,6 +159,18 @@ namespace BlockPuzzle.Score
                 result.CellScore,
                 result.ClearComboScore,
                 result.ComboCountUsed);
+
+            // 抛出 Combo 触发 / 中断事件,供 FxLibrary / FloatingTextLibrary / AudioBindings 消费
+            if (result.ComboCountUsed > 0)
+            {
+                BlockPuzzle.Core.GameplayEvents.Raise(
+                    BlockPuzzle.Core.GameplayEventId.ComboTriggered,
+                    new BlockPuzzle.Core.GameplayEventArgs
+                    {
+                        IntValue = (int)result.TotalScore,
+                        IntValue2 = result.ComboCountUsed,
+                    });
+            }
             OnComboChanged?.Invoke(_comboState.ComboCount);
             OnScoreChanged?.Invoke(_score);
         }

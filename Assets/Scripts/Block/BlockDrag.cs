@@ -1,218 +1,124 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using BlockPuzzle.Audio;
 using BlockPuzzle.Board;
+using BlockPuzzle.Config;
+using BlockPuzzle.Core;
 using BlockPuzzle.Utils;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 namespace BlockPuzzle.Block
 {
     /// <summary>
-    /// 方块拖拽逻辑：兼容新版 Input System 和旧版 Input Manager。
-    /// 不再依赖 OnMouseXxx（它们只在旧版 Input Manager 下有效）。
+    /// 方块拖拽(UGUI 版,M-R3 重构,M-R7+ 修复)。
+    ///
+    /// 修复点:
+    /// 1. 拖拽偏移(X/Y)挪到 GameplayTuning,策划/美术可调
+    /// 2. 预览位置用"方块中心点"而不是"手指原始位置"——这样预览紧贴方块,不会跑到手指下方
     /// </summary>
-    public class BlockDrag : MonoBehaviour
+    [RequireComponent(typeof(RectTransform))]
+    public class BlockDrag : MonoBehaviour,
+        IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         private BlockData _blockData;
         private int _colorIndex;
-        private int _candidateIndex;
         private Color _blockColor;
+        private int _candidateIndex;
+        private BlockSpawner _spawner;
 
-        private Vector3 _originalPosition;
+        private RectTransform _rt;
+        private RectTransform _originalParent;
+        private Vector2 _originalAnchoredPos;
         private Vector3 _originalScale;
-        private bool _isDragging;
-        private Camera _mainCam;
-        private Collider2D _collider;
+        private Vector2 _originalSizeDelta;
+        private Vector2 _originalAnchorMin, _originalAnchorMax, _originalPivot;
+
+        private CanvasGroup _canvasGroup;
+        private Canvas _rootCanvas;
+        private RectTransform _dragLayer;
+
         private BlockAudioFeedback _audioFeedback;
+        private Vector2Int _lastPreviewCell = new Vector2Int(-9999, -9999);
+        private bool _isDragging;
 
-        /// <summary>
-        /// 候选区宽松拖拽模式：手指在候选区范围内任意位置即可拖动最近的方块。
-        /// 由 SceneBootstrap 注入，默认 false（精准点击模式）。
-        /// </summary>
-        private bool _looseCandidateDrag;
-
-        /// <summary>设置宽松候选区拖拽模式</summary>
-        public void SetLooseCandidateDrag(bool enabled) { _looseCandidateDrag = enabled; }
-
-        // 拖拽时方块锚点相对鼠标的固定偏移：向上抬高一些，避免手指/光标遮挡
-        // 并向左下偏移半格，让"鼠标尖端"对齐方块左下角格子的中心
-        private static readonly Vector3 DragAnchorOffset = new Vector3(0f, 2.0f, 0f);
-
-        // 当前预览位置
-        private Vector2Int _lastPreviewGrid = new Vector2Int(-999, -999);
-
-        public void Init(BlockData data, int colorIndex, int candidateIndex)
+        public void Init(BlockData data, int colorIndex, Color color, int candidateIndex, BlockSpawner spawner)
         {
             _blockData = data;
             _colorIndex = colorIndex;
+            _blockColor = color;
             _candidateIndex = candidateIndex;
-            _blockColor = Constants.BlockColors[colorIndex];
+            _spawner = spawner;
         }
 
-        /// <summary>
-        /// 计算从方块中心锚点到左下角格子中心的世界空间偏移。
-        /// 方块创建时锚点在包围盒中心，但 WorldToGrid 需要左下角格子的坐标。
-        /// </summary>
-        private Vector3 GetCenterToOriginOffset()
+        private void Awake()
         {
-            if (_blockData == null) return Vector3.zero;
-
-            int minX = int.MaxValue, minY = int.MaxValue;
-            int maxX = int.MinValue, maxY = int.MinValue;
-            foreach (var cell in _blockData.Cells)
-            {
-                if (cell.x < minX) minX = cell.x;
-                if (cell.y < minY) minY = cell.y;
-                if (cell.x > maxX) maxX = cell.x;
-                if (cell.y > maxY) maxY = cell.y;
-            }
-
-            float step = BoardManager.Instance.CellSize + BoardManager.Instance.CellSpacing;
-            float offsetX = -(maxX - minX) * step * 0.5f;
-            float offsetY = -(maxY - minY) * step * 0.5f;
-            return new Vector3(offsetX, offsetY, 0f);
-        }
-
-        /// <summary>
-        /// 运行时布局变化时更新原始位置和缩放（拖拽取消时回弹用）
-        /// </summary>
-        public void UpdateOriginalPosition(Vector3 position, Vector3 scale)
-        {
-            _originalPosition = position;
-            _originalScale = scale;
-        }
-
-        private bool _initialized;
-
-        private void Start()
-        {
-            EnsureInit();
-        }
-
-        private void EnsureInit()
-        {
-            if (_initialized) return;
-            _mainCam = Camera.main;
-            if (_mainCam == null) return;
-            _collider = GetComponent<Collider2D>();
+            _rt = GetComponent<RectTransform>();
+            _canvasGroup = GetComponent<CanvasGroup>();
+            if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
             _audioFeedback = GetComponent<BlockAudioFeedback>();
-            // 如果自身没有 Collider2D，尝试从子对象获取（如 Slot→Block 层级结构）
-            if (_collider == null)
-                _collider = GetComponentInChildren<Collider2D>();
-            if (_collider == null) return;
-            _originalPosition = transform.position;
-            _originalScale = transform.localScale;
-            _initialized = true;
         }
 
-        private void Update()
+        // ==================== Pointer 事件 ====================
+
+        public void OnPointerDown(PointerEventData eventData)
         {
-            if (!_initialized)
-            {
-                EnsureInit();
-                if (!_initialized) return;
-            }
-            // 游戏结束时禁用交互
-            if (Core.GameManager.Instance != null &&
-                Core.GameManager.Instance.CurrentState != Core.GameState.Playing)
-            {
-                if (_isDragging) CancelDrag();
-                return;
-            }
-
-            bool pointerDown = GetPointerDownThisFrame();
-            bool pointerHeld = GetPointerHeld();
-            bool pointerUp = GetPointerUpThisFrame();
-
-            if (!_isDragging && pointerDown)
-            {
-                Vector3 pointerWorld = GetPointerWorldPos();
-
-                if (_looseCandidateDrag)
-                {
-                    // 宽松模式：候选区 Y 范围内，由 BlockSpawner 统一仲裁最近的方块
-                    float candidateY = Constants.CandidateCenter.y;
-                    float candidateHalfHeight = 3.0f; // 候选区上下容差范围（世界单位）
-                    if (Mathf.Abs(pointerWorld.y - candidateY) < candidateHalfHeight
-                        && BlockSpawner.Instance != null)
-                    {
-                        int closestIdx = BlockSpawner.Instance.GetClosestCandidateIndex(
-                            new Vector2(pointerWorld.x, pointerWorld.y));
-                        if (closestIdx == _candidateIndex)
-                            BeginDrag(pointerWorld);
-                    }
-                }
-                else
-                {
-                    // 精准模式：射线检测，点击的是否是自己的 Collider
-                    var hit = Physics2D.OverlapPoint(pointerWorld);
-                    if (hit != null && hit == _collider)
-                    {
-                        BeginDrag(pointerWorld);
-                    }
-                }
-            }
-            else if (_isDragging && pointerHeld)
-            {
-                DragUpdate();
-            }
-            else if (_isDragging && pointerUp)
-            {
-                EndDrag();
-            }
-        }
-
-        // ==================== 拖拽流程 ====================
-
-        private void BeginDrag(Vector3 pointerWorld)
-        {
-            _isDragging = true;
+            if (!IsGamePlaying()) return;
             _audioFeedback?.PlayPick();
+        }
+
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            if (!IsGamePlaying()) return;
+            _isDragging = true;
             _audioFeedback?.PlayDragBegin();
-            // 拖拽时缩放到与棋盘格子一致的大小（棋盘有 VisualScale 缩放）
-            float dragScale = BoardManager.Instance != null ? BoardManager.Instance.VisualScale : 1f;
-            transform.localScale = Vector3.one * dragScale;
-            // 立即把方块锚点对齐到"鼠标指向的格子中心"上方
-            SnapToPointer(pointerWorld);
+
+            CacheOriginalTransform();
+            _rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+            _dragLayer = ResolveDragLayer();
+
+            // Reparent 到 DragLayer。先把 anchor/pivot 切成中心固定模式,
+            // 否则原 Slot 的"撑满父级"anchor 在 DragLayer 下会让方块铺满整个屏幕。
+            float currentWidth = _rt.rect.width;
+            float currentHeight = _rt.rect.height;
+
+            transform.SetParent(_dragLayer != null ? _dragLayer : (Transform)_rootCanvas?.transform, true);
+
+            _rt.anchorMin = new Vector2(0.5f, 0.5f);
+            _rt.anchorMax = new Vector2(0.5f, 0.5f);
+            _rt.pivot = new Vector2(0.5f, 0.5f);
+            _rt.sizeDelta = new Vector2(currentWidth, currentHeight);
+
+            // 拖拽期间 raycast 透传,不阻挡棋盘事件检测
+            _canvasGroup.blocksRaycasts = false;
+
+            // 拖拽时方块缩放到棋盘格的实际大小
+            ApplyBoardScale();
+            UpdateDragPosition(eventData);
         }
 
-        private void DragUpdate()
+        public void OnDrag(PointerEventData eventData)
         {
-            Vector3 pointerWorld = GetPointerWorldPos();
-            SnapToPointer(pointerWorld);
-            UpdatePreview();
+            if (!_isDragging) return;
+            UpdateDragPosition(eventData);
+            UpdatePreview(eventData.pressEventCamera);
         }
 
-        /// <summary>
-        /// 将方块锚点（中心）对齐到鼠标位置（加固定偏移向上抬高避免遮挡）。
-        /// </summary>
-        private void SnapToPointer(Vector3 pointerWorld)
+        public void OnEndDrag(PointerEventData eventData)
         {
-            transform.position = pointerWorld + DragAnchorOffset;
-        }
-
-        private void EndDrag()
-        {
+            if (!_isDragging) return;
             _isDragging = false;
 
-            if (BoardManager.Instance != null)
-            {
-                BoardManager.Instance.ClearPreview();
-                BoardManager.Instance.ClearClearPreviewHighlight();
-            }
+            BoardManager.Instance?.ClearPreview();
+            BoardManager.Instance?.ClearClearPreviewHighlight();
+            _canvasGroup.blocksRaycasts = true;
 
-            // 方块锚点在中心，需要补偿到左下角格子坐标做 WorldToGrid
-            Vector3 originWorldPos = transform.position + GetCenterToOriginOffset();
-            Vector2Int gridPos = BoardManager.Instance.WorldToGrid(originWorldPos);
-
-            if (BoardManager.Instance.CanPlace(_blockData.Cells, gridPos.x, gridPos.y))
+            if (TryPlaceAtPointer(eventData))
             {
                 _audioFeedback?.PlayDropSuccess();
-                BoardManager.Instance.PlaceBlock(_blockData.Cells, gridPos.x, gridPos.y, _blockColor);
-                BlockSpawner.Instance.MarkUsed(_candidateIndex);
+                BoardManager.Instance.PlaceBlock(_blockData.Cells, _placeOriginCol, _placeOriginRow, _blockColor);
+                _spawner.MarkUsed(_candidateIndex);
 
-                var remaining = BlockSpawner.Instance.GetRemainingCandidates();
+                var remaining = _spawner.GetRemainingCandidates();
                 BoardManager.Instance.CheckGameOver(remaining);
 
                 Destroy(gameObject);
@@ -220,105 +126,166 @@ namespace BlockPuzzle.Block
             else
             {
                 _audioFeedback?.PlayDropFailed();
-                // 放置失败，回到原位
-                transform.position = _originalPosition;
-                transform.localScale = _originalScale;
+                ReturnToOrigin();
             }
         }
 
-        private void CancelDrag()
+        // ==================== 内部:位置 / 预览 ====================
+
+        private int _placeOriginCol, _placeOriginRow;
+        private bool _placeValid;
+
+        private void UpdateDragPosition(PointerEventData eventData)
         {
-            _isDragging = false;
-            _audioFeedback?.PlayCancel();
-            if (BoardManager.Instance != null)
+            if (_rootCanvas == null) return;
+
+            // 把屏幕坐标转成 DragLayer(或 rootCanvas)的局部坐标
+            var parent = (RectTransform)transform.parent;
+            if (parent == null) return;
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parent, eventData.position, eventData.pressEventCamera, out var local);
+
+            // 由 GameplayTuning 决定拖拽偏移(策划/美术可在 .asset 里调)
+            float boardCellSize = BoardManager.Instance?.Layout?.CellSize ?? 80f;
+            var tuning = SceneBootstrap.ActiveConfig?.Gameplay;
+            float offX = tuning != null ? tuning.DragOffsetXInCells : 0f;
+            float offY = tuning != null ? tuning.DragOffsetYInCells : 1.5f;
+            local.x += boardCellSize * offX;
+            local.y += boardCellSize * offY;
+            _rt.anchoredPosition = local;
+        }
+
+        private void UpdatePreview(Camera pressCamera)
+        {
+            var board = BoardManager.Instance;
+            if (board == null) return;
+
+            // 把方块"几何中心"对应的屏幕坐标转换成棋盘行列
+            // 方块的 RectTransform 中心 = transform.position(屏幕空间)
+            Vector3 worldCenter = _rt.position;
+            // 把方块中心点位置投到屏幕,再用 Board 提供的 ScreenToCell 反算
+            Vector2 screenPos = RectTransformUtility.WorldToScreenPoint(GetCanvasCamera(), worldCenter);
+
+            if (!board.ScreenToCell(screenPos, GetCanvasCamera(), out var centerCell, out var localPoint))
             {
-                BoardManager.Instance.ClearPreview();
-                BoardManager.Instance.ClearClearPreviewHighlight();
+                _placeValid = false;
+                board.ClearPreview();
+                board.ClearClearPreviewHighlight();
+                _lastPreviewCell = new Vector2Int(-9999, -9999);
+                return;
             }
-            transform.position = _originalPosition;
-            transform.localScale = _originalScale;
-        }
 
-        // ==================== 预览 ====================
+            // 方块中心 → 形状原点(左下角格子)
+            var (minX, minY, maxX, maxY) = ShapeBounds(_blockData);
+            int widthCells = maxX - minX + 1;
+            int heightCells = maxY - minY + 1;
+            int originCol = centerCell.x - (widthCells - 1) / 2;
+            int originRow = centerCell.y - (heightCells - 1) / 2;
 
-        private void UpdatePreview()
-        {
-            // 方块锚点在中心，需要补偿到左下角格子坐标
-            Vector3 originWorldPos = transform.position + GetCenterToOriginOffset();
-            Vector2Int gridPos = BoardManager.Instance.WorldToGrid(originWorldPos);
+            if (originCol == _lastPreviewCell.x && originRow == _lastPreviewCell.y) return;
+            _lastPreviewCell = new Vector2Int(originCol, originRow);
 
-            if (gridPos == _lastPreviewGrid) return;
-            _lastPreviewGrid = gridPos;
+            _placeOriginCol = originCol;
+            _placeOriginRow = originRow;
+            _placeValid = board.CanPlace(_blockData.Cells, originCol, originRow);
 
-            bool valid = BoardManager.Instance.CanPlace(_blockData.Cells, gridPos.x, gridPos.y);
-            BoardManager.Instance.ShowPreview(_blockData.Cells, gridPos.x, gridPos.y, valid);
-
-            // 消除预览高亮：如果放置后能填满行/列，高亮显示
-            if (valid)
-                BoardManager.Instance.ShowClearPreviewHighlight(_blockData.Cells, gridPos.x, gridPos.y);
+            board.ShowPreview(_blockData.Cells, originCol, originRow, _placeValid);
+            if (_placeValid)
+                board.ShowClearPreviewHighlight(_blockData.Cells, originCol, originRow);
             else
-                BoardManager.Instance.ClearClearPreviewHighlight();
+                board.ClearClearPreviewHighlight();
         }
 
-        // ==================== 输入抽象（兼容新旧输入系统） ====================
-
-        private Vector3 GetPointerWorldPos()
+        private bool TryPlaceAtPointer(PointerEventData eventData)
         {
-            Vector2 screenPos = GetPointerScreenPos();
-            Vector3 v = new Vector3(screenPos.x, screenPos.y, Mathf.Abs(_mainCam.transform.position.z));
-            return _mainCam.ScreenToWorldPoint(v);
+            UpdatePreview(eventData.pressEventCamera);
+            return _placeValid;
         }
 
-        private Vector2 GetPointerScreenPos()
+        private void ReturnToOrigin()
         {
-#if ENABLE_INPUT_SYSTEM
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-                return Touchscreen.current.primaryTouch.position.ReadValue();
-            if (Mouse.current != null)
-                return Mouse.current.position.ReadValue();
-            return Vector2.zero;
-#else
-            return (Vector2)Input.mousePosition;
-#endif
+            transform.SetParent(_originalParent, false);
+            _rt.anchorMin = _originalAnchorMin;
+            _rt.anchorMax = _originalAnchorMax;
+            _rt.pivot = _originalPivot;
+            _rt.sizeDelta = _originalSizeDelta;
+            _rt.anchoredPosition = _originalAnchoredPos;
+            _rt.localScale = _originalScale;
         }
 
-        private bool GetPointerDownThisFrame()
+        // ==================== 辅助 ====================
+
+        private void CacheOriginalTransform()
         {
-#if ENABLE_INPUT_SYSTEM
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
-                return true;
-            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-                return true;
-            return false;
-#else
-            return Input.GetMouseButtonDown(0);
-#endif
+            _originalParent = (RectTransform)transform.parent;
+            _originalAnchoredPos = _rt.anchoredPosition;
+            _originalScale = _rt.localScale;
+            _originalSizeDelta = _rt.sizeDelta;
+            _originalAnchorMin = _rt.anchorMin;
+            _originalAnchorMax = _rt.anchorMax;
+            _originalPivot = _rt.pivot;
         }
 
-        private bool GetPointerHeld()
+        private void ApplyBoardScale()
         {
-#if ENABLE_INPUT_SYSTEM
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-                return true;
-            if (Mouse.current != null && Mouse.current.leftButton.isPressed)
-                return true;
-            return false;
-#else
-            return Input.GetMouseButton(0);
-#endif
+            // 拖拽时把方块每格缩放到与棋盘格一致
+            var board = BoardManager.Instance;
+            if (board == null || board.Layout == null) return;
+            float boardCellSize = board.Layout.CellSize;
+            // 当前方块每格大小 = "Cells" 容器子节点的 sizeDelta.x
+            var cellsRt = _rt.Find("Cells") as RectTransform;
+            if (cellsRt == null || cellsRt.childCount == 0) return;
+            var sample = cellsRt.GetChild(0) as RectTransform;
+            if (sample == null || sample.sizeDelta.x <= 0f) return;
+
+            float currentCell = sample.sizeDelta.x * _rt.localScale.x;
+            if (currentCell <= 0f) return;
+
+            float scaleFactor = boardCellSize / currentCell;
+            _rt.localScale = _originalScale * scaleFactor;
         }
 
-        private bool GetPointerUpThisFrame()
+        private RectTransform ResolveDragLayer()
         {
-#if ENABLE_INPUT_SYSTEM
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasReleasedThisFrame)
-                return true;
-            if (Mouse.current != null && Mouse.current.leftButton.wasReleasedThisFrame)
-                return true;
-            return false;
-#else
-            return Input.GetMouseButtonUp(0);
-#endif
+            if (_rootCanvas == null) return null;
+            // 约定:Canvas 下名为 "DragLayer" 的子节点用作拖拽层。不存在则现场创建。
+            var existing = _rootCanvas.transform.Find("DragLayer") as RectTransform;
+            if (existing != null) return existing;
+
+            var go = new GameObject("DragLayer", typeof(RectTransform));
+            existing = go.GetComponent<RectTransform>();
+            existing.SetParent(_rootCanvas.transform, false);
+            existing.anchorMin = Vector2.zero;
+            existing.anchorMax = Vector2.one;
+            existing.offsetMin = Vector2.zero;
+            existing.offsetMax = Vector2.zero;
+            existing.SetAsLastSibling();
+            return existing;
+        }
+
+        private Camera GetCanvasCamera()
+        {
+            if (_rootCanvas == null) return null;
+            return _rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _rootCanvas.worldCamera;
+        }
+
+        private static (int minX, int minY, int maxX, int maxY) ShapeBounds(BlockData data)
+        {
+            int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+            foreach (var c in data.Cells)
+            {
+                if (c.x < minX) minX = c.x;
+                if (c.y < minY) minY = c.y;
+                if (c.x > maxX) maxX = c.x;
+                if (c.y > maxY) maxY = c.y;
+            }
+            return (minX, minY, maxX, maxY);
+        }
+
+        private static bool IsGamePlaying()
+        {
+            return GameManager.Instance == null || GameManager.Instance.CurrentState == GameState.Playing;
         }
     }
 }

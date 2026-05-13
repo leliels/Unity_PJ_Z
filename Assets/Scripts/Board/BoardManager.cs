@@ -1,517 +1,502 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using BlockPuzzle.Core;
+using UnityEngine.UI;
 using BlockPuzzle.Block;
+using BlockPuzzle.Config;
+using BlockPuzzle.Core;
 using BlockPuzzle.Utils;
 
 namespace BlockPuzzle.Board
 {
     /// <summary>
-    /// 棋盘管理器：创建网格、处理放置、调用消除、检查游戏结束
+    /// 棋盘管理器（UGUI 版,M-R2 重构）。
+    ///
+    /// 与旧版 SpriteRenderer 实现的区别:
+    /// 1. 所有渲染都是 UI Image,在 PlayCanvas 下
+    /// 2. 单元尺寸由 BoardRoot 实际宽度运行时算出,屏幕宽高比一变,棋盘自动等比缩放
+    /// 3. 不再有 CellSize / CellSpacing 世界单位字段;不再有 BoardCenter 世界坐标
+    /// 4. 坐标换算统一走 BoardLayout 工具
+    ///
+    /// 公共接口保留:Init / ClearBoard / CanPlace / PlaceBlock / IsInsideBoard / CanPlaceAny /
+    /// CheckGameOver / ShowPreview / ClearPreview / ShowClearPreviewHighlight / ClearClearPreviewHighlight
+    /// 事件保留:OnBlockPlaced / OnLinesCleared / OnGameOver
+    /// 移除:GridToWorld / WorldToGrid(改为 BoardLayout.CellToLocal / LocalToCell)
     /// </summary>
     public class BoardManager : Singleton<BoardManager>
     {
-        // ==================== Inspector 可调参数 ====================
-        [Header("棋盘布局参数")]
-        [Tooltip("每个格子的世界单位大小")]
-        [SerializeField] private float _cellSize = 1f;
-        [Tooltip("格子之间的间距")]
-        [SerializeField] private float _cellSpacing = 0.08f;
-        [Tooltip("棋盘中心世界坐标")]
-        [SerializeField] private Vector3 _boardCenter;
-        [Tooltip("棋盘整体视觉缩放（1.0=原始大小）")]
-        [SerializeField] private float _visualScale = 1.12f;
+        // ==================== Inspector 引用 ====================
+        [Header("UGUI 渲染")]
+        [Tooltip("棋盘根 RectTransform。挂在 PlayCanvas 下,通常带 AspectRatioFitter 锁 1:1。")]
+        [SerializeField] private RectTransform _boardRoot;
 
-        // --- 运行时有效值 ---
-        /// <summary>运行时格子大小</summary>
-        public float CellSize => _cellSize;
-        /// <summary>运行时间距</summary>
-        public float CellSpacing => _cellSpacing;
-        /// <summary>运行时棋盘中心</summary>
-        public Vector3 BoardCenter => _boardCenter;
-        /// <summary>运行时视觉缩放</summary>
-        public float VisualScale => _visualScale;
+        [Tooltip("单元格 Prefab(必须含 Image 组件)。运行时实例化 64 个。")]
+        [SerializeField] private GameObject _uiCellPrefab;
 
-        // --- Prefab 引用（Inspector 可配置） ---
-        [Header("Prefab 配置")]
-        [Tooltip("棋盘格子 Prefab（需含 SpriteRenderer）。为空时使用代码创建 fallback。")]
-        [SerializeField] private GameObject _cellPrefab;
+        [Tooltip("放置预览/消除高亮 Prefab(含 Image 组件)。可选,为空时用 UICell 同一份 Prefab。")]
+        [SerializeField] private GameObject _uiPreviewPrefab;
 
-        [Tooltip("预览格子 Prefab（需含 SpriteRenderer）。为空时使用代码创建 fallback。")]
-        [SerializeField] private GameObject _previewPrefab;
-
-        // --- 事件 ---
-        /// <summary>放置方块后触发（参数：放置的格子数）</summary>
+        // ==================== 事件 ====================
         public event Action<int> OnBlockPlaced;
-        /// <summary>消除行/列后触发（参数：消除的行/列总数）</summary>
         public event Action<int> OnLinesCleared;
-        /// <summary>游戏结束触发</summary>
         public event Action OnGameOver;
 
-        // --- 棋盘数据 ---
-        private bool[,] _grid;                          // [col, row] 占用状态
-        private SpriteRenderer[,] _cellRenderers;       // [col, row] 格子渲染器
-        private Color[,] _cellColors;                   // [col, row] 格子颜色记录
-        private Transform _boardContainer;
-        private Transform _boardScaleRoot;              // 整体缩放根节点
+        // ==================== 棋盘数据 ====================
+        private bool[,] _grid;
+        private Image[,] _cellImages;
+        private Color[,] _cellColors;
 
-        // Cell/Preview Prefab 由 BoardManager Prefab 自身 Inspector 配置，不再需要外部注入
+        // 三个层:格子层、消除高亮层、放置预览层(后者覆盖前者)
+        private RectTransform _cellsContainer;
+        private RectTransform _highlightContainer;
+        private RectTransform _previewContainer;
 
-        // --- 棋盘的世界坐标起点（左下角） ---
-        private Vector3 _boardOrigin;
+        private BoardLayout _layout;
+        private LayoutConfig _layoutConfig;
+        private UIThemeConfig _theme;
 
-        // --- 格子总步长（大小+间距） ---
-        private float CellStep => CellSize + CellSpacing;
+        // ==================== 初始化 ====================
+
+        public RectTransform BoardRoot => _boardRoot;
+        public BoardLayout Layout => _layout;
 
         protected override void Awake()
         {
             base.Awake();
         }
 
-#if UNITY_EDITOR
-        /// <summary>Inspector 参数变化时自动重新布局（编辑器模式 + Play 模式均生效）</summary>
-        private void OnValidate()
+        /// <summary>由 SceneBootstrap 注入配置。无配置时用默认色。</summary>
+        public void Configure(LayoutConfig layoutConfig, UIThemeConfig theme)
         {
-            if (_boardContainer == null) return;
-            RelayoutBoard();
+            _layoutConfig = layoutConfig;
+            _theme = theme;
         }
-#endif
 
-        /// <summary>
-        /// 手动刷新棋盘布局（运行时调用）
-        /// </summary>
-        public void RefreshLayout() => RelayoutBoard();
-
-        /// <summary>
-        /// 初始化棋盘
-        /// </summary>
         public void Init()
         {
+            if (_boardRoot == null)
+            {
+                Debug.LogError("[BoardManager] _boardRoot 未配置,无法初始化。请在 BoardManager Prefab 上指定棋盘根 RectTransform。");
+                return;
+            }
+
             ClearBoardVisuals();
 
-            _grid = new bool[Constants.BoardCols, Constants.BoardRows];
-            _cellColors = new Color[Constants.BoardCols, Constants.BoardRows];
-            _cellRenderers = new SpriteRenderer[Constants.BoardCols, Constants.BoardRows];
+            int cols = _layoutConfig != null ? _layoutConfig.BoardCols : Constants.BoardCols;
+            int rows = _layoutConfig != null ? _layoutConfig.BoardRows : Constants.BoardRows;
+            _grid = new bool[cols, rows];
+            _cellColors = new Color[cols, rows];
+            _cellImages = new Image[cols, rows];
 
-            // 计算棋盘左下角世界坐标
-            float boardWidth = Constants.BoardCols * CellStep - CellSpacing;
-            float boardHeight = Constants.BoardRows * CellStep - CellSpacing;
-            _boardOrigin = BoardCenter - new Vector3(boardWidth / 2f, boardHeight / 2f, 0f);
+            _layout = new BoardLayout(_boardRoot, _layoutConfig);
 
-            CreateBoardVisuals();
+            // 强制 layout 系统先把 BoardRoot 的 rect.width/height 算出来,
+            // 否则首次 Awake 时 rect.width=0,CellSize 会算成 0,所有格子摆不出来(用户原现象)。
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(_boardRoot);
+
+            EnsureContainers();
+            CreateCells();
+
+            // 二次保险:有些情况下 ForceRebuildLayoutImmediate 不能在 Awake 同帧解析所有父级,
+            // 下一帧再 RelayoutCells 一次,确保所有格子位置和大小正确。
+            if (Application.isPlaying && isActiveAndEnabled)
+                StartCoroutine(NextFrameRelayout());
+        }
+
+        private System.Collections.IEnumerator NextFrameRelayout()
+        {
+            yield return null;
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(_boardRoot);
+            RelayoutCells();
         }
 
         /// <summary>
-        /// 清除棋盘（重新开始用）
+        /// 仅重新摆放已有 cell 的位置和大小,不销毁不重建。
+        /// 配置(LayoutConfig)修改后调用,实现实时生效。
         /// </summary>
+        public void RelayoutCells()
+        {
+            if (_layout == null || _cellImages == null) return;
+            float size = _layout.CellSize;
+            int cols = _layout.Cols;
+            int rows = _layout.Rows;
+            for (int col = 0; col < cols; col++)
+            for (int row = 0; row < rows; row++)
+            {
+                var img = _cellImages[col, row];
+                if (img != null) SetCellRect(img.rectTransform, col, row, size);
+            }
+        }
+
         public void ClearBoard()
         {
             Init();
         }
 
-        private void ClearBoardVisuals()
+        private void EnsureContainers()
         {
-            for (int i = transform.childCount - 1; i >= 0; i--)
-            {
-                Transform child = transform.GetChild(i);
-                if (child == null || child.name != "BoardScaleRoot") continue;
-                child.gameObject.SetActive(false);
-                Destroy(child.gameObject);
-            }
-
-            _boardScaleRoot = null;
-            _boardContainer = null;
+            _cellsContainer = EnsureChildContainer("Cells", 0);
+            _highlightContainer = EnsureChildContainer("ClearHighlights", 1);
+            _previewContainer = EnsureChildContainer("PlacementPreview", 2);
         }
 
-        // ==================== 可视化 ====================
-
-        private void CreateBoardVisuals()
+        private RectTransform EnsureChildContainer(string name, int siblingIndex)
         {
-            // 1. 缩放根节点：锚点在棋盘中心，整体缩放
-            _boardScaleRoot = new GameObject("BoardScaleRoot").transform;
-            _boardScaleRoot.SetParent(transform);
-            _boardScaleRoot.position = BoardCenter;
-            _boardScaleRoot.localScale = Vector3.one * VisualScale;
-
-            // 2. 棋盘容器（格子父节点），局部坐标偏移使格子围绕中心分布
-            float boardWidth = Constants.BoardCols * CellStep - CellSpacing;
-            float boardHeight = Constants.BoardRows * CellStep - CellSpacing;
-            _boardContainer = new GameObject("BoardContainer").transform;
-            _boardContainer.SetParent(_boardScaleRoot);
-            _boardContainer.localPosition = new Vector3(-boardWidth / 2f, -boardHeight / 2f, 0f);
-            _boardContainer.localScale = Vector3.one;
-
-            Sprite cellSprite = SpriteUtils.CellSprite;
-
-            for (int col = 0; col < Constants.BoardCols; col++)
+            var t = _boardRoot.Find(name) as RectTransform;
+            if (t == null)
             {
-                for (int row = 0; row < Constants.BoardRows; row++)
-                {
-                    GameObject cellGo;
-                    SpriteRenderer sr;
+                var go = new GameObject(name, typeof(RectTransform));
+                t = go.GetComponent<RectTransform>();
+                t.SetParent(_boardRoot, false);
+                t.anchorMin = Vector2.zero;
+                t.anchorMax = Vector2.one;
+                t.offsetMin = Vector2.zero;
+                t.offsetMax = Vector2.zero;
+                t.SetSiblingIndex(siblingIndex);
 
-                    if (_cellPrefab != null)
+                // 容器不接 raycast,避免吃掉拖拽事件
+                var img = go.AddComponent<Image>();
+                img.color = Color.clear;
+                img.raycastTarget = false;
+            }
+            return t;
+        }
+
+        private void ClearBoardVisuals()
+        {
+            if (_boardRoot == null) return;
+            // 清空老的内部容器(整个重建)
+            // 必须用 DestroyImmediate 同步销毁,否则下一行 EnsureContainers 的 Find 会
+            // 找到正在等待销毁的旧容器,新格子摆到旧容器上,产生重叠/错位(原 bug:重开第 2 次没视觉)。
+            for (int i = _boardRoot.childCount - 1; i >= 0; i--)
+            {
+                var child = _boardRoot.GetChild(i);
+                if (child.name == "Cells" || child.name == "ClearHighlights" || child.name == "PlacementPreview")
+                {
+                    if (Application.isPlaying)
                     {
-                        // Prefab 方式：实例化预制体
-                        cellGo = Instantiate(_cellPrefab, _boardContainer);
-                        cellGo.name = $"Cell_{col}_{row}";
-                        // 局部坐标（相对于 BoardContainer），原点在左下角
-                        cellGo.transform.localPosition = new Vector3(
-                            col * CellStep + CellSize / 2f,
-                            row * CellStep + CellSize / 2f,
-                            0f
-                        );
-                        cellGo.transform.localScale = Vector3.one;
-                        sr = cellGo.GetComponent<SpriteRenderer>();
-                        if (sr == null) sr = cellGo.AddComponent<SpriteRenderer>();
-                        sr.size = new Vector2(CellSize, CellSize);
+                        // Play 模式下 DestroyImmediate 仍然安全(它是 EditorOnly 警告但 runtime 可用,且这是我们自建对象)
+                        // 用 SetParent(null) + Destroy 兜底等效同步移除
+                        child.SetParent(null, false);
+                        UnityEngine.Object.Destroy(child.gameObject);
                     }
                     else
                     {
-                        // Fallback：代码创建（兼容无 Prefab 情况）
-                        cellGo = new GameObject($"Cell_{col}_{row}");
-                        cellGo.transform.SetParent(_boardContainer);
-                        cellGo.transform.localPosition = new Vector3(
-                            col * CellStep + CellSize / 2f,
-                            row * CellStep + CellSize / 2f,
-                            0f
-                        );
-                        cellGo.transform.localScale = Vector3.one;
-                        sr = cellGo.AddComponent<SpriteRenderer>();
-                        sr.sprite = cellSprite;
-                        sr.size = new Vector2(CellSize, CellSize);
+#if UNITY_EDITOR
+                        UnityEngine.Object.DestroyImmediate(child.gameObject);
+#endif
                     }
+                }
+            }
+            _cellsContainer = null;
+            _highlightContainer = null;
+            _previewContainer = null;
+        }
 
-                    sr.color = Constants.CellEmptyColor;
-                    sr.sortingOrder = 0;
+        // ==================== 创建格子 ====================
 
-                    _cellRenderers[col, row] = sr;
-                    _cellColors[col, row] = Constants.CellEmptyColor;
+        private void CreateCells()
+        {
+            int cols = _layout.Cols;
+            int rows = _layout.Rows;
+            float size = _layout.CellSize;
+
+            Color emptyColor = _theme != null ? _theme.CellEmptyColor : Constants.CellEmptyColor;
+            // 如果策划在 UIThemeConfig 把 CellEmptyColor 配成了完全透明(alpha<0.01),
+            // 用一个轻微可见的默认底色,确保玩家看得到棋盘范围(原 bug:进游戏看不到棋盘)。
+            if (emptyColor.a < 0.01f)
+                emptyColor = new Color(1f, 1f, 1f, 0.12f);
+
+            // 加载棋盘格底图(brd_cell.png),让格子有美术质感而非纯色块
+            var cellSprite = Utils.SpriteUtils.CellSprite;
+
+            for (int col = 0; col < cols; col++)
+            {
+                for (int row = 0; row < rows; row++)
+                {
+                    var img = CreateUIImage(_cellsContainer, $"Cell_{col}_{row}", _uiCellPrefab);
+                    img.raycastTarget = false;
+                    if (img.sprite == null && cellSprite != null) img.sprite = cellSprite;
+                    SetCellRect(img.rectTransform, col, row, size);
+                    img.color = emptyColor;
+
+                    _cellImages[col, row] = img;
+                    _cellColors[col, row] = emptyColor;
                 }
             }
         }
 
-        // ==================== 坐标转换 ====================
-
-        /// <summary>
-        /// 网格坐标转世界坐标
-        /// </summary>
-        public Vector3 GridToWorld(int col, int row)
+        private void SetCellRect(RectTransform rt, int col, int row, float size)
         {
-            return _boardOrigin + new Vector3(
-                col * CellStep + CellSize / 2f,
-                row * CellStep + CellSize / 2f,
-                0f
-            );
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(size, size);
+            rt.anchoredPosition = _layout.CellToLocal(col, row);
+            rt.localScale = Vector3.one;
         }
 
-        /// <summary>
-        /// 世界坐标转网格坐标（最近的格子）
-        /// </summary>
-        public Vector2Int WorldToGrid(Vector3 worldPos)
+        private static Image CreateUIImage(Transform parent, string name, GameObject prefab)
         {
-            float relX = worldPos.x - _boardOrigin.x;
-            float relY = worldPos.y - _boardOrigin.y;
-
-            int col = Mathf.RoundToInt((relX - CellSize / 2f) / CellStep);
-            int row = Mathf.RoundToInt((relY - CellSize / 2f) / CellStep);
-
-            return new Vector2Int(col, row);
+            GameObject go;
+            if (prefab != null)
+            {
+                go = Instantiate(prefab, parent, false);
+                go.name = name;
+            }
+            else
+            {
+                go = new GameObject(name, typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(parent, false);
+            }
+            var img = go.GetComponent<Image>();
+            if (img == null) img = go.AddComponent<Image>();
+            return img;
         }
 
-        /// <summary>
-        /// 检查网格坐标是否在棋盘范围内
-        /// </summary>
-        public bool IsInsideBoard(int col, int row)
-        {
-            return col >= 0 && col < Constants.BoardCols && row >= 0 && row < Constants.BoardRows;
-        }
+        // ==================== 坐标换算辅助 ====================
 
-        // ==================== 放置逻辑 ====================
+        public bool IsInsideBoard(int col, int row) => _layout != null && _layout.IsInside(col, row);
 
-        /// <summary>
-        /// 判断方块是否可以放置到指定位置
-        /// </summary>
-        /// <param name="cells">方块形状的相对坐标</param>
-        /// <param name="originCol">放置原点列</param>
-        /// <param name="originRow">放置原点行</param>
+        // ==================== 放置 ====================
+
         public bool CanPlace(Vector2Int[] cells, int originCol, int originRow)
         {
+            if (cells == null || _grid == null) return false;
             foreach (var cell in cells)
             {
                 int c = originCol + cell.x;
                 int r = originRow + cell.y;
-
                 if (!IsInsideBoard(c, r)) return false;
                 if (_grid[c, r]) return false;
             }
             return true;
         }
 
-        /// <summary>
-        /// 放置方块到棋盘
-        /// </summary>
         public void PlaceBlock(Vector2Int[] cells, int originCol, int originRow, Color color)
         {
-            int placedCount = 0;
-
+            int placed = 0;
+            // 累加放置位置,用作事件锚点(取重心)
+            float sumX = 0f, sumY = 0f;
+            var blockSprite = Utils.SpriteUtils.BlockSprite;
             foreach (var cell in cells)
             {
                 int c = originCol + cell.x;
                 int r = originRow + cell.y;
-
                 _grid[c, r] = true;
-                _cellRenderers[c, r].color = color;
+                if (_cellImages[c, r] != null)
+                {
+                    if (blockSprite != null) _cellImages[c, r].sprite = blockSprite;
+                    _cellImages[c, r].color = color;
+                }
                 _cellColors[c, r] = color;
-                placedCount++;
+                placed++;
+                sumX += c; sumY += r;
             }
 
-            OnBlockPlaced?.Invoke(placedCount);
+            // 计算放置中心的屏幕坐标(供特效/音效作锚点)
+            Vector2 placeScreen = CellsCenterToScreen(originCol, originRow, cells);
 
-            // 先清除预览阶段的高亮（防止残留）
+            OnBlockPlaced?.Invoke(placed);
+            GameplayEvents.Raise(GameplayEventId.BlockPlaced,
+                new GameplayEventArgs { ScreenPosition = placeScreen, IntValue = placed });
+
             ClearClearPreviewHighlight();
+            ClearPreview();
 
-            // 检测并立即执行消除
             var (fullRows, fullCols) = MatchChecker.CheckMatches(_grid);
             int totalLines = fullRows.Count + fullCols.Count;
-
             if (totalLines > 0)
             {
+                Color emptyColor = _theme != null ? _theme.CellEmptyColor : Constants.CellEmptyColor;
+                if (emptyColor.a < 0.01f) emptyColor = new Color(1f, 1f, 1f, 0.12f);
+                var cellSprite = Utils.SpriteUtils.CellSprite;
                 var clearedCells = MatchChecker.ClearLines(_grid, fullRows, fullCols);
-
-                // 更新视觉
+                Vector2 clearScreen = ClearCenterToScreen(clearedCells);
                 foreach (var pos in clearedCells)
                 {
-                    _cellRenderers[pos.x, pos.y].color = Constants.CellEmptyColor;
-                    _cellColors[pos.x, pos.y] = Constants.CellEmptyColor;
+                    if (_cellImages[pos.x, pos.y] != null)
+                    {
+                        if (cellSprite != null) _cellImages[pos.x, pos.y].sprite = cellSprite;
+                        _cellImages[pos.x, pos.y].color = emptyColor;
+                    }
+                    _cellColors[pos.x, pos.y] = emptyColor;
                 }
-
                 OnLinesCleared?.Invoke(totalLines);
+                GameplayEvents.Raise(GameplayEventId.LineCleared,
+                    new GameplayEventArgs { ScreenPosition = clearScreen, IntValue = totalLines });
             }
 
-            // 通知 GameManager 本回合结束（用于 Combo 中断判定）
-            if (Core.GameManager.Instance != null)
-                Core.GameManager.Instance.OnTurnComplete();
+            if (GameManager.Instance != null)
+                GameManager.Instance.OnTurnComplete();
         }
 
-        // ==================== 游戏结束判定 ====================
+        // 给 cells (相对坐标) + originCol/Row 算屏幕坐标(取中心格中心)
+        private Vector2 CellsCenterToScreen(int originCol, int originRow, Vector2Int[] cells)
+        {
+            if (cells == null || cells.Length == 0 || _layout == null) return Vector2.zero;
+            float sumX = 0, sumY = 0;
+            foreach (var c in cells) { sumX += c.x; sumY += c.y; }
+            float avgCol = originCol + sumX / cells.Length;
+            float avgRow = originRow + sumY / cells.Length;
+            return CellPosToScreen(avgCol, avgRow);
+        }
 
-        /// <summary>
-        /// 检查指定的候选方块列表中是否有任何一个能放到棋盘上
-        /// </summary>
+        private Vector2 ClearCenterToScreen(System.Collections.Generic.List<Vector2Int> cells)
+        {
+            if (cells == null || cells.Count == 0 || _layout == null) return Vector2.zero;
+            float sumX = 0, sumY = 0;
+            foreach (var c in cells) { sumX += c.x; sumY += c.y; }
+            return CellPosToScreen(sumX / cells.Count, sumY / cells.Count);
+        }
+
+        private Vector2 CellPosToScreen(float col, float row)
+        {
+            // 用整数版 CellToLocal 内插
+            int c0 = Mathf.FloorToInt(col);
+            int r0 = Mathf.FloorToInt(row);
+            Vector2 a = _layout.CellToLocal(c0, r0);
+            Vector2 b = _layout.CellToLocal(c0 + 1, r0 + 1);
+            Vector2 local = new Vector2(
+                Mathf.Lerp(a.x, b.x, col - c0),
+                Mathf.Lerp(a.y, b.y, row - r0));
+            Vector3 world = _boardRoot.TransformPoint(local);
+            var canvas = _boardRoot.GetComponentInParent<Canvas>();
+            Camera cam = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay) ? canvas.worldCamera : null;
+            return RectTransformUtility.WorldToScreenPoint(cam, world);
+        }
+
+        // ==================== 游戏结束 ====================
+
         public bool CanPlaceAny(List<BlockData> candidates)
         {
+            if (candidates == null || _layout == null) return false;
+            int cols = _layout.Cols;
+            int rows = _layout.Rows;
             foreach (var block in candidates)
             {
                 if (block == null) continue;
-                for (int col = 0; col < Constants.BoardCols; col++)
-                {
-                    for (int row = 0; row < Constants.BoardRows; row++)
-                    {
-                        if (CanPlace(block.Cells, col, row))
-                            return true;
-                    }
-                }
+                for (int c = 0; c < cols; c++)
+                    for (int r = 0; r < rows; r++)
+                        if (CanPlace(block.Cells, c, r)) return true;
             }
             return false;
         }
 
-        /// <summary>
-        /// 放置后检查游戏是否结束
-        /// </summary>
-        public void CheckGameOver(List<BlockData> remainingCandidates)
+        public void CheckGameOver(List<BlockData> remaining)
         {
-            if (!CanPlaceAny(remainingCandidates))
+            if (!CanPlaceAny(remaining))
             {
                 OnGameOver?.Invoke();
+                GameplayEvents.Raise(GameplayEventId.GameOver);
             }
         }
 
-        // ==================== 预览 ====================
+        // ==================== 预览(放置吸附时) ====================
 
-        private List<SpriteRenderer> _previewRenderers = new List<SpriteRenderer>();
+        private readonly List<Image> _previewImages = new List<Image>();
 
-        /// <summary>
-        /// 显示放置预览
-        /// </summary>
         public void ShowPreview(Vector2Int[] cells, int originCol, int originRow, bool valid)
         {
             ClearPreview();
+            if (cells == null || _layout == null || _previewContainer == null) return;
 
-            Color previewColor = valid ? Constants.PreviewValidColor : Constants.PreviewInvalidColor;
+            float size = _layout.CellSize;
+            Color color = valid
+                ? (_theme != null ? _theme.PreviewValidColor : Constants.PreviewValidColor)
+                : (_theme != null ? _theme.PreviewInvalidColor : Constants.PreviewInvalidColor);
+
+            // 预览也用方块贴图(blk_base.png),与放置后的视觉一致,只是颜色透明度更低
+            var previewSprite = Utils.SpriteUtils.BlockSprite;
 
             foreach (var cell in cells)
             {
                 int c = originCol + cell.x;
                 int r = originRow + cell.y;
-
                 if (!IsInsideBoard(c, r)) continue;
 
-                GameObject go;
-                SpriteRenderer sr;
-
-                if (_previewPrefab != null)
-                    {
-                        // Prefab 方式
-                        go = Instantiate(_previewPrefab, _boardScaleRoot);
-                        go.name = "Preview";
-                        go.transform.localPosition = new Vector3(
-                            c * CellStep + CellSize / 2f,
-                            r * CellStep + CellSize / 2f,
-                            0f
-                        ) + _boardContainer.localPosition;
-                        go.transform.localScale = Vector3.one;
-                        sr = go.GetComponent<SpriteRenderer>();
-                        if (sr == null) sr = go.AddComponent<SpriteRenderer>();
-                        sr.size = new Vector2(CellSize, CellSize);
-                    }
-                    else
-                    {
-                        // Fallback：代码创建
-                        go = new GameObject("Preview");
-                        go.transform.SetParent(_boardScaleRoot);
-                        go.transform.localPosition = new Vector3(
-                            c * CellStep + CellSize / 2f,
-                            r * CellStep + CellSize / 2f,
-                            0f
-                        ) + _boardContainer.localPosition;
-                        go.transform.localScale = Vector3.one;
-                        sr = go.AddComponent<SpriteRenderer>();
-                        sr.sprite = SpriteUtils.CellSprite;
-                        sr.size = new Vector2(CellSize, CellSize);
-                    }
-
-                sr.color = previewColor;
-                sr.sortingOrder = 5;
-
-                _previewRenderers.Add(sr);
+                var img = CreateUIImage(_previewContainer, "Preview", _uiPreviewPrefab != null ? _uiPreviewPrefab : _uiCellPrefab);
+                img.raycastTarget = false;
+                if (img.sprite == null && previewSprite != null) img.sprite = previewSprite;
+                SetCellRect(img.rectTransform, c, r, size);
+                img.color = color;
+                _previewImages.Add(img);
             }
         }
 
-        /// <summary>
-        /// 清除预览
-        /// </summary>
         public void ClearPreview()
         {
-            foreach (var sr in _previewRenderers)
-            {
-                if (sr != null) Destroy(sr.gameObject);
-            }
-            _previewRenderers.Clear();
+            foreach (var img in _previewImages)
+                if (img != null) Destroy(img.gameObject);
+            _previewImages.Clear();
         }
 
-        // ==================== 消除预览高亮（拖拽时提示） ====================
+        // ==================== 消除高亮 ====================
 
-        private List<SpriteRenderer> _clearHighlightRenderers = new List<SpriteRenderer>();
+        private readonly List<Image> _highlightImages = new List<Image>();
 
-        /// <summary>
-        /// 显示消除预览高亮：模拟放置方块后，检测哪些行/列会被填满，并用高亮颜色标记。
-        /// 在拖拽预览阶段调用，给玩家"放这里可以消除"的视觉反馈。
-        /// </summary>
         public void ShowClearPreviewHighlight(Vector2Int[] cells, int originCol, int originRow)
         {
             ClearClearPreviewHighlight();
+            if (cells == null || _layout == null || _highlightContainer == null) return;
 
-            // 模拟放置，临时标记格子
-            var simulatedGrid = (bool[,])_grid.Clone();
+            int cols = _layout.Cols;
+            int rows = _layout.Rows;
+
+            var simulated = (bool[,])_grid.Clone();
             foreach (var cell in cells)
             {
                 int c = originCol + cell.x;
                 int r = originRow + cell.y;
-                if (IsInsideBoard(c, r))
-                    simulatedGrid[c, r] = true;
+                if (IsInsideBoard(c, r)) simulated[c, r] = true;
             }
 
-            // 检测模拟放置后的满行/满列
-            var (fullRows, fullCols) = MatchChecker.CheckMatches(simulatedGrid);
+            var (fullRows, fullCols) = MatchChecker.CheckMatches(simulated);
             if (fullRows.Count == 0 && fullCols.Count == 0) return;
 
-            // 收集需要高亮的格子坐标（去重）
-            var highlightSet = new HashSet<(int, int)>();
+            var set = new HashSet<(int, int)>();
             foreach (int row in fullRows)
-                for (int col = 0; col < Constants.BoardCols; col++)
-                    highlightSet.Add((col, row));
+                for (int c = 0; c < cols; c++) set.Add((c, row));
             foreach (int col in fullCols)
-                for (int row = 0; row < Constants.BoardRows; row++)
-                    highlightSet.Add((col, row));
+                for (int r = 0; r < rows; r++) set.Add((col, r));
 
-            // 为每个要消除的格子创建高亮覆盖层（不修改原始格子颜色）
-            Color hlColor = Constants.ClearPreviewHighlightColor;
-            foreach (var (col, row) in highlightSet)
+            float size = _layout.CellSize;
+            Color hl = _theme != null ? _theme.ClearPreviewHighlightColor : Constants.ClearPreviewHighlightColor;
+            var hlSprite = Utils.SpriteUtils.BlockSprite;
+
+            foreach (var (col, row) in set)
             {
-                GameObject go = new GameObject("ClearHighlight");
-                go.transform.SetParent(_boardScaleRoot);
-                go.transform.localPosition = new Vector3(
-                    col * CellStep + CellSize / 2f,
-                    row * CellStep + CellSize / 2f,
-                    0f
-                ) + _boardContainer.localPosition;
-                go.transform.localScale = Vector3.one;
-
-                    var sr = go.AddComponent<SpriteRenderer>();
-                    sr.sprite = SpriteUtils.CellSprite;
-                    sr.size = new Vector2(CellSize, CellSize);
-                    sr.color = hlColor;
-                sr.sortingOrder = 3; // 在普通格子(0)之上、放置预览(5)之下
-
-                _clearHighlightRenderers.Add(sr);
+                var img = CreateUIImage(_highlightContainer, "ClearHighlight", _uiPreviewPrefab != null ? _uiPreviewPrefab : _uiCellPrefab);
+                img.raycastTarget = false;
+                if (img.sprite == null && hlSprite != null) img.sprite = hlSprite;
+                SetCellRect(img.rectTransform, col, row, size);
+                img.color = hl;
+                _highlightImages.Add(img);
             }
         }
 
-        /// <summary>
-        /// 清除所有消除预览高亮
-        /// </summary>
         public void ClearClearPreviewHighlight()
         {
-            foreach (var sr in _clearHighlightRenderers)
-            {
-                if (sr != null) Destroy(sr.gameObject);
-            }
-            _clearHighlightRenderers.Clear();
+            foreach (var img in _highlightImages)
+                if (img != null) Destroy(img.gameObject);
+            _highlightImages.Clear();
         }
 
-        // ==================== 运行时重新布局 ====================
+        // ==================== 屏幕坐标 → 行列 ====================
 
         /// <summary>
-        /// 运行时就地重新布局：根据 Inspector 参数重新计算所有格子位置和大小。
-        /// 不销毁/重建对象，不影响游戏状态（占用、颜色等全部保留）。
+        /// 屏幕像素 → 棋盘行列。pressEventCamera 应为 PlayCanvas.worldCamera(ScreenSpaceCamera 模式),
+        /// 或 null(ScreenSpaceOverlay 模式)。是否在棋盘内 = 返回值 inside && IsInsideBoard。
         /// </summary>
-        public void RelayoutBoard()
+        public bool ScreenToCell(Vector2 screenPos, Camera pressEventCamera, out Vector2Int cell, out Vector2 localPoint)
         {
-            if (_cellRenderers == null) return;
-
-            // 重新计算棋盘尺寸
-            float boardWidth = Constants.BoardCols * CellStep - CellSpacing;
-            float boardHeight = Constants.BoardRows * CellStep - CellSpacing;
-            _boardOrigin = BoardCenter - new Vector3(boardWidth / 2f, boardHeight / 2f, 0f);
-
-            // 更新缩放根节点
-            if (_boardScaleRoot != null)
+            if (_layout == null)
             {
-                _boardScaleRoot.position = BoardCenter;
-                _boardScaleRoot.localScale = Vector3.one * VisualScale;
+                cell = new Vector2Int(-1, -1);
+                localPoint = Vector2.zero;
+                return false;
             }
-
-            // 更新棋盘容器偏移
-            if (_boardContainer != null)
-                _boardContainer.localPosition = new Vector3(-boardWidth / 2f, -boardHeight / 2f, 0f);
-
-            for (int col = 0; col < Constants.BoardCols; col++)
-            {
-                for (int row = 0; row < Constants.BoardRows; row++)
-                {
-                    var sr = _cellRenderers[col, row];
-                    if (sr == null) continue;
-
-                    sr.transform.localPosition = new Vector3(
-                        col * CellStep + CellSize / 2f,
-                        row * CellStep + CellSize / 2f,
-                        0f
-                    );
-                    sr.size = new Vector2(CellSize, CellSize);
-                }
-            }
+            return _layout.ScreenToCell(screenPos, pressEventCamera, out cell, out localPoint);
         }
     }
 }

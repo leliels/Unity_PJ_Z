@@ -3,376 +3,546 @@ using UnityEngine.UI;
 using BlockPuzzle.Audio;
 using BlockPuzzle.Board;
 using BlockPuzzle.Block;
+using BlockPuzzle.Config;
 using BlockPuzzle.Feedback;
 using BlockPuzzle.Mode;
 using BlockPuzzle.Save;
 using BlockPuzzle.Score;
 using BlockPuzzle.UI;
+using BlockPuzzle.UI.Layout;
 
 namespace BlockPuzzle.Core
 {
     /// <summary>
-    /// 场景启动器：自动创建并配置所有运行时所需的管理器和UI。
-    /// 将此脚本挂载到场景中的空 GameObject 上即可。
-    /// 
-    /// 设计原则：
-    /// - 此脚本持有需要实例化的 Prefab 引用列表
-    /// - 视觉细节（字号、颜色、图标、锚点等）在各自 Prefab 内调整
-    /// - 布局参数由各自 Manager 的 Prefab Inspector 管理（BoardManager 管棋盘布局，BlockSpawner 管候选区布局）
+    /// 场景启动器(M-R2/R3 重写,UGUI 化版本)。
+    ///
+    /// 启动流程:
+    ///   1. 加载 GameConfig.asset(M-R1 已落地)
+    ///   2. 配置主相机
+    ///   3. 用代码搭出 4 个 Canvas(背景/玩法/HUD/弹窗)
+    ///   4. 在 PlayCanvas 下生成 BoardRoot + CandidateRoot
+    ///   5. 实例化 Manager Prefab + 注入 RectTransform / Config
+    ///   6. 启动 GameManager 进入对局
+    ///
+    /// Inspector 字段精简到只剩"必须由场景给出的 Prefab 引用"。其它布局/数值参数走 GameConfig。
     /// </summary>
     public class SceneBootstrap : MonoBehaviour
     {
-        // ==================== Prefab 引用列表 ====================
-        [Header("需要调用的 Prefab")]
-        [Tooltip("BoardManager Prefab（含棋盘布局参数 + Cell/Preview Prefab 引用）")]
+        // ==================== Prefab 引用 ====================
+        [Header("管理器 Prefab(可选)")]
+        [Tooltip("BoardManager Prefab。为空时,Bootstrap 会在 PlayCanvas 下挂一个空 BoardManager。")]
         [SerializeField] private GameObject _boardManagerPrefab;
 
-        [Tooltip("BlockSpawner Prefab（含 BlockCell/CandidateSlot Prefab 引用 + 候选区参数）")]
+        [Tooltip("BlockSpawner Prefab。为空时同 BoardManager。")]
         [SerializeField] private GameObject _blockSpawnerPrefab;
 
-        [Tooltip("分数显示 Prefab（含 NumberImageDisplay 组件，当前分数）")]
+        [Header("UI Prefab(可选)")]
+        [Tooltip("背景图 Prefab(包含 Image 组件,用于 BackgroundCanvas)。为空时回退到 Resources/Art/Backgrounds/bg_game。")]
+        [SerializeField] private GameObject _backgroundPrefab;
+
+        [Tooltip("分数显示 Prefab(含 NumberImageDisplay)。挂在 HudCanvas 上。")]
         [SerializeField] private GameObject _scoreDisplayPrefab;
 
-        [Tooltip("最高分显示 Prefab（含 NumberImageDisplay 组件 + 图标）")]
+        [Tooltip("最高分显示 Prefab。挂在 HudCanvas 上。")]
         [SerializeField] private GameObject _highScoreDisplayPrefab;
 
-        [Tooltip("GameOver 面板 Prefab（含 FinalScoreText + RestartButton）")]
+        [Tooltip("GameOver 面板 Prefab。挂在 OverlayCanvas 上。")]
         [SerializeField] private GameObject _gameOverPanelPrefab;
 
-        [Tooltip("旧版飘字 Prefab（需含 Text + Outline 组件，新版为空时 fallback）")]
+        [Tooltip("飘字 Prefab(老版,含 Text + Outline,可选)。")]
         [SerializeField] private GameObject _floatingScorePrefab;
 
-        [Tooltip("新版组合飘字 Prefab（需含 ScorePopupView 组件）")]
+        [Tooltip("结构化飘字 Prefab(含 ScorePopupView)。")]
         [SerializeField] private GameObject _scorePopupPrefab;
 
-        [Tooltip("重新开始按钮 Prefab（HUD 左上角）")]
-        [SerializeField] private GameObject _restartButtonPrefab;
+        [Header("棋盘渲染 Prefab")]
+        [Tooltip("UICell Prefab(单格 Image)。为空时代码 fallback。")]
+        [SerializeField] private GameObject _uiCellPrefab;
 
-        [Tooltip("背景 Canvas Prefab（含背景图、候选区底板装饰等固定 UI）")]
-        [SerializeField] private GameObject _backgroundCanvasPrefab;
+        [Tooltip("UI 放置预览 Prefab(可选,Image 类型)。")]
+        [SerializeField] private GameObject _uiPreviewPrefab;
 
-        // ==================== 玩法配置 ====================
-        [Header("玩法配置")]
-        [Tooltip("本场景启动时传给 ScoreManager 的计分配置。可为不同模式指定不同 ScoreConfig；为空时默认加载 Resources/Configs/ScoreConfig。")]
+        [Header("候选区 Prefab")]
+        [Tooltip("候选槽位 Prefab(RectTransform + Image)。")]
+        [SerializeField] private GameObject _candidateSlotPrefab;
+
+        [Tooltip("方块单格 Prefab(Image)。")]
+        [SerializeField] private GameObject _blockCellPrefab;
+
+        [Header("回退用计分配置")]
+        [Tooltip("没有 GameConfig 时使用的 ScoreConfig。GameConfig 存在时会被覆盖。")]
         [SerializeField] private ScoreConfig _scoreConfig;
 
-        // ==================== 候选区布局参数 ====================
-        [Header("候选区布局")]
-        [Tooltip("候选区中心的世界坐标")]
-        [SerializeField] private Vector3 _candidateCenter = new Vector3(0f, -8.5f, 0f);
+        // ==================== 全局缓存 ====================
+        public static GameConfig ActiveConfig { get; private set; }
 
-        [Tooltip("候选方块之间的水平间距")]
-        [SerializeField] private float _candidateSpacing = 3.5f;
+        // 构建出来的 Canvas / Root,供其它系统读取
+        public static Canvas BackgroundCanvas { get; private set; }
+        public static Canvas PlayCanvas { get; private set; }
+        public static Canvas HudCanvas { get; private set; }
+        public static Canvas OverlayCanvas { get; private set; }
+        public static RectTransform BoardRoot { get; private set; }
+        public static RectTransform CandidateRoot { get; private set; }
+        public static RectTransform HudSafeRoot { get; private set; }
+        public static RectTransform OverlaySafeRoot { get; private set; }
 
-        [Tooltip("候选方块的缩放比例")]
-        [SerializeField] private float _candidateScale = 0.35f;
+        // ==================== 启动 ====================
 
         private void Awake()
         {
-            ApplyLayoutConfig();
+            LoadGameConfig();
             SetupCamera();
-            CreateBackgroundUI();
+            EnsureEventSystem();
+            BuildCanvases();
+            BuildBoardLayout();
             CreateManagers();
             CreateUI();
+            CreateSelfServiceManagers();
         }
 
-        /// <summary>
-        /// 将 Inspector 中的候选区布局配置写入 Constants，供 BlockSpawner 使用
-        /// </summary>
-        private void ApplyLayoutConfig()
+        private void LoadGameConfig()
         {
-            Utils.Constants.CandidateCenter = _candidateCenter;
-            Utils.Constants.CandidateSpacing = _candidateSpacing;
-            Utils.Constants.CandidateScale = _candidateScale;
+            ActiveConfig = GameConfig.LoadFromResources();
+            if (ActiveConfig == null)
+            {
+                Debug.LogWarning("[SceneBootstrap] 未找到 GameConfig.asset。建议菜单 BlockPuzzle/游戏配置中心 创建。" +
+                                 "本次启动使用 Inspector / 默认值回退。");
+                return;
+            }
+
+            var missing = ActiveConfig.ValidateRuntime();
+            if (missing.Length > 0)
+                Debug.LogWarning("[SceneBootstrap] GameConfig 缺字段:" + string.Join(", ", missing));
+            else
+                Debug.Log("[SceneBootstrap] GameConfig 加载成功:" + ActiveConfig.name);
+
+            if (ActiveConfig.Score != null) _scoreConfig = ActiveConfig.Score;
         }
 
-        // ==================== 配置相机 ====================
+        // ==================== 相机 ====================
 
         private void SetupCamera()
         {
             var cam = Camera.main;
-            if (cam == null) return;
-
+            if (cam == null)
+            {
+                var camGo = new GameObject("Main Camera");
+                camGo.tag = "MainCamera";
+                cam = camGo.AddComponent<Camera>();
+                camGo.AddComponent<AudioListener>();
+            }
             cam.orthographic = true;
-            cam.orthographicSize = 11f;
+            // orthographicSize 不再硬编码用于布局,仅作占位(背景纯色)
+            cam.orthographicSize = 5f;
             cam.transform.position = new Vector3(0f, 0f, -10f);
-            cam.backgroundColor = new Color(0.15f, 0.12f, 0.10f, 1f);
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.05f, 0.05f, 0.08f, 1f);
         }
 
-        // ==================== 创建背景 ====================
-
-        private void CreateBackgroundUI()
+        private void EnsureEventSystem()
         {
-            if (_backgroundCanvasPrefab != null)
+            if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() != null) return;
+            var go = new GameObject("EventSystem");
+            go.AddComponent<UnityEngine.EventSystems.EventSystem>();
+#if ENABLE_INPUT_SYSTEM
+            go.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+#else
+            go.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+#endif
+        }
+
+        // ==================== 4 Canvas ====================
+
+        private void BuildCanvases()
+        {
+            var refRes = ActiveConfig?.Layout != null ? ActiveConfig.Layout.ReferenceResolution : new Vector2(1080f, 1920f);
+            float match = ActiveConfig?.Layout != null ? ActiveConfig.Layout.MatchWidthOrHeight : 0.5f;
+            var theme = ActiveConfig?.Theme;
+
+            BackgroundCanvas = BuildCanvas("BackgroundCanvas", RenderMode.ScreenSpaceCamera, sortOrder: 0, refRes, match);
+            PlayCanvas = BuildCanvas("PlayCanvas", RenderMode.ScreenSpaceCamera, sortOrder: 10, refRes, match);
+            HudCanvas = BuildCanvas("HudCanvas", RenderMode.ScreenSpaceOverlay, sortOrder: 20, refRes, match);
+            OverlayCanvas = BuildCanvas("OverlayCanvas", RenderMode.ScreenSpaceOverlay, sortOrder: 30, refRes, match);
+
+            // 背景图
+            CreateBackgroundImage(BackgroundCanvas);
+
+            // HUD / Overlay 各放一个 SafeAreaRoot,后续所有 HUD 内容都进 SafeAreaRoot
+            HudSafeRoot = CreateSafeAreaRoot(HudCanvas, theme, isHud: true);
+            OverlaySafeRoot = CreateSafeAreaRoot(OverlayCanvas, theme, isHud: false);
+        }
+
+        private Canvas BuildCanvas(string name, RenderMode mode, int sortOrder, Vector2 refRes, float match)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var canvas = go.AddComponent<Canvas>();
+            canvas.renderMode = mode;
+            canvas.sortingOrder = sortOrder;
+
+            if (mode == RenderMode.ScreenSpaceCamera)
             {
-                var bgCanvasGo = Instantiate(_backgroundCanvasPrefab);
-                bgCanvasGo.name = "BackgroundCanvas";
-                // 强制设为 ScreenSpaceCamera 模式，确保背景在世界空间物体之后渲染
-                var bgCanvas = bgCanvasGo.GetComponent<Canvas>();
-                if (bgCanvas != null)
-                {
-                    bgCanvas.renderMode = RenderMode.ScreenSpaceCamera;
-                    bgCanvas.worldCamera = Camera.main;
-                    bgCanvas.planeDistance = 50f;
-                    bgCanvas.sortingOrder = -10;
-                }
-                return;
+                canvas.worldCamera = Camera.main;
+                canvas.planeDistance = 10f + sortOrder; // 背景 / 玩法 平面距离 错开,避免穿插
             }
 
-            // Fallback：代码创建
-            Debug.LogWarning("[SceneBootstrap] _backgroundCanvasPrefab 未配置，使用代码创建背景");
-            var bgSprite = Utils.SpriteUtils.BackgroundSprite;
-            if (bgSprite == null) return;
+            var scaler = go.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = refRes;
+            scaler.matchWidthOrHeight = match;
 
-            var fallbackGo = new GameObject("BackgroundCanvas");
-            var canvas = fallbackGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            canvas.worldCamera = Camera.main;
-            canvas.planeDistance = 50f;
-            canvas.sortingOrder = -10;
-
-            var bgScaler = fallbackGo.AddComponent<CanvasScaler>();
-            bgScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            bgScaler.referenceResolution = new Vector2(1080, 1920);
-            bgScaler.matchWidthOrHeight = 1f;
-
-            var bgImageGo = new GameObject("BackgroundImage");
-            bgImageGo.transform.SetParent(fallbackGo.transform, false);
-
-            var bgRect = bgImageGo.AddComponent<RectTransform>();
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.offsetMin = Vector2.zero;
-            bgRect.offsetMax = Vector2.zero;
-
-            var bgImage = bgImageGo.AddComponent<Image>();
-            bgImage.sprite = bgSprite;
-            bgImage.type = Image.Type.Simple;
-            bgImage.preserveAspect = false;
-            bgImage.raycastTarget = false;
+            go.AddComponent<GraphicRaycaster>();
+            return canvas;
         }
 
-        // ==================== 创建管理器 ====================
+        private void CreateBackgroundImage(Canvas bgCanvas)
+        {
+            GameObject bg;
+            if (_backgroundPrefab != null)
+            {
+                bg = Instantiate(_backgroundPrefab, bgCanvas.transform, false);
+                bg.name = "Background";
+            }
+            else
+            {
+                bg = new GameObject("Background", typeof(RectTransform), typeof(Image));
+                bg.transform.SetParent(bgCanvas.transform, false);
+                var img = bg.GetComponent<Image>();
+                img.sprite = Utils.SpriteUtils.BackgroundSprite;
+                img.raycastTarget = false;
+                img.preserveAspect = false;
+            }
+            var rt = bg.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+            }
+        }
+
+        private RectTransform CreateSafeAreaRoot(Canvas parentCanvas, UIThemeConfig theme, bool isHud)
+        {
+            var go = new GameObject("SafeAreaRoot", typeof(RectTransform));
+            var rt = go.GetComponent<RectTransform>();
+            rt.SetParent(parentCanvas.transform, false);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            // 是否挂 SafeAreaFitter,看 UIThemeConfig 策略
+            UIThemeConfig.SafeAreaPolicy policy = theme != null ? theme.SafeAreaMode : UIThemeConfig.SafeAreaPolicy.HudAndOverlay;
+            bool apply = policy switch
+            {
+                UIThemeConfig.SafeAreaPolicy.None => false,
+                UIThemeConfig.SafeAreaPolicy.HudOnly => isHud,
+                UIThemeConfig.SafeAreaPolicy.OverlayOnly => !isHud,
+                UIThemeConfig.SafeAreaPolicy.HudAndOverlay => true,
+                _ => true,
+            };
+            if (apply) go.AddComponent<SafeAreaFitter>();
+            return rt;
+        }
+
+        // ==================== 棋盘布局(Board / Candidate Root) ====================
+
+        private void BuildBoardLayout()
+        {
+            var layoutConfig = ActiveConfig?.Layout;
+            float topMargin = layoutConfig != null ? layoutConfig.BoardMarginTopRatio : 0.18f;
+            float bottomMargin = layoutConfig != null ? layoutConfig.BoardMarginBottomRatio : 0.30f;
+            float candidateBottom = layoutConfig != null ? layoutConfig.CandidateBottomMarginRatio : 0.05f;
+
+            // ==================== BoardRoot ====================
+            // 策略:用 anchor 在屏幕中"刨"出一块矩形区域(顶部留白~底部留白 = 棋盘可占空间),
+            // BoardRoot 自己用 AspectRatioFitter 在这块区域里居中并锁 1:1。
+            // 这样在任意宽高比下,只要可占空间够,棋盘永远是正方形居中。
+            //
+            // 关键:不能像旧实现那样 anchorMin.y == anchorMax.y(让 anchor 是一条线),
+            // 必须 anchor 是一块面积,才能让父级 RectTransform 计算出宽度让 AspectRatioFitter 用。
+
+            // 第一步:外层"棋盘可用区"(由 LayoutConfig 留白决定),anchor 撑出实际矩形
+            var slotGo = new GameObject("BoardSlot", typeof(RectTransform));
+            var boardSlot = slotGo.GetComponent<RectTransform>();
+            boardSlot.SetParent(PlayCanvas.transform, false);
+            boardSlot.anchorMin = new Vector2(0f, bottomMargin);
+            boardSlot.anchorMax = new Vector2(1f, 1f - topMargin);
+            boardSlot.offsetMin = Vector2.zero;
+            boardSlot.offsetMax = Vector2.zero;
+            boardSlot.localScale = Vector3.one;
+
+            // 第二步:BoardRoot 是 BoardSlot 的子节点,挂 AspectRatioFitter,
+            // FitInParent 会自动计算最大可放下的 1:1 矩形并居中。
+            var boardGo = new GameObject("BoardRoot", typeof(RectTransform));
+            BoardRoot = boardGo.GetComponent<RectTransform>();
+            BoardRoot.SetParent(boardSlot, false);
+            BoardRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            BoardRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            BoardRoot.pivot = new Vector2(0.5f, 0.5f);
+            BoardRoot.anchoredPosition = Vector2.zero;
+            BoardRoot.localScale = Vector3.one;
+
+            var fitter = boardGo.AddComponent<AspectRatioFitter>();
+            fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fitter.aspectRatio = 1f;
+
+            // ==================== CandidateRoot ====================
+            var candGo = new GameObject("CandidateRoot", typeof(RectTransform));
+            CandidateRoot = candGo.GetComponent<RectTransform>();
+            CandidateRoot.SetParent(PlayCanvas.transform, false);
+            CandidateRoot.anchorMin = new Vector2(0.05f, candidateBottom);
+            CandidateRoot.anchorMax = new Vector2(0.95f, bottomMargin);
+            CandidateRoot.offsetMin = Vector2.zero;
+            CandidateRoot.offsetMax = Vector2.zero;
+            CandidateRoot.localScale = Vector3.one;
+        }
+
+        // ==================== Manager 创建 ====================
 
         private void CreateManagers()
         {
             EnsureGlobalServices();
 
-            // BoardManager：Prefab 上已包含 Cell/Preview Prefab 引用
-            if (FindFirstObjectByType<BoardManager>() == null)
-            {
-                if (_boardManagerPrefab != null)
-                {
-                    var boardGo = Instantiate(_boardManagerPrefab);
-                    boardGo.name = "[BoardManager]";
-                    boardGo.SetActive(true);
-                }
-                else
-                {
-                    Debug.LogWarning("[SceneBootstrap] _boardManagerPrefab 未配置，使用默认参数创建 BoardManager");
-                    var boardGo = new GameObject("[BoardManager]");
-                    boardGo.AddComponent<BoardManager>();
-                }
-            }
-
-            // BlockSpawner：Prefab 上已包含 BlockCell/CandidateSlot/底板等引用
-            if (FindFirstObjectByType<BlockSpawner>() == null)
-            {
-                if (_blockSpawnerPrefab != null)
-                {
-                    var spawnerGo = Instantiate(_blockSpawnerPrefab);
-                    spawnerGo.name = "[BlockSpawner]";
-                    spawnerGo.SetActive(true);
-                }
-                else
-                {
-                    Debug.LogWarning("[SceneBootstrap] _blockSpawnerPrefab 未配置，使用默认参数创建 BlockSpawner");
-                    var spawnerGo = new GameObject("[BlockSpawner]");
-                    spawnerGo.AddComponent<BlockSpawner>();
-                }
-            }
-
-            // ScoreManager
-            var scoreManager = FindFirstObjectByType<ScoreManager>();
-            if (scoreManager == null)
-            {
-                var scoreGo = new GameObject("[ScoreManager]");
-                scoreManager = scoreGo.AddComponent<ScoreManager>();
-            }
-            scoreManager.SetConfig(_scoreConfig);
-
-            // GameManager（最后创建）
-            if (FindFirstObjectByType<GameManager>() == null)
-            {
-                var gmGo = new GameObject("[GameManager]");
-                gmGo.AddComponent<GameManager>();
-            }
+            CreateBoardManager();
+            CreateBlockSpawner();
+            CreateScoreManager();
+            CreateGameManager();
         }
 
         private void EnsureGlobalServices()
         {
             _ = SaveManager.Instance;
             _ = ModeManager.Instance;
-            var audioManager = AudioManager.Instance;
+            var audio = AudioManager.Instance;
             _ = FeedbackManager.Instance;
-            audioManager?.PlayGameBgm();
+            audio?.PlayGameBgm();
         }
 
-        // ==================== 创建 UI ====================
+        private void CreateBoardManager()
+        {
+            var existing = FindFirstObjectByType<BoardManager>();
+            if (existing == null)
+            {
+                if (_boardManagerPrefab != null)
+                {
+                    var go = Instantiate(_boardManagerPrefab);
+                    go.name = "[BoardManager]";
+                    existing = go.GetComponent<BoardManager>();
+                }
+                else
+                {
+                    var go = new GameObject("[BoardManager]");
+                    existing = go.AddComponent<BoardManager>();
+                }
+            }
+            // 注入 BoardRoot
+            InjectField(existing, "_boardRoot", BoardRoot);
+            InjectField(existing, "_uiCellPrefab", _uiCellPrefab);
+            InjectField(existing, "_uiPreviewPrefab", _uiPreviewPrefab);
+            existing.Configure(ActiveConfig?.Layout, ActiveConfig?.Theme);
+        }
+
+        private void CreateBlockSpawner()
+        {
+            var existing = FindFirstObjectByType<BlockSpawner>();
+            if (existing == null)
+            {
+                if (_blockSpawnerPrefab != null)
+                {
+                    var go = Instantiate(_blockSpawnerPrefab);
+                    go.name = "[BlockSpawner]";
+                    existing = go.GetComponent<BlockSpawner>();
+                }
+                else
+                {
+                    var go = new GameObject("[BlockSpawner]");
+                    existing = go.AddComponent<BlockSpawner>();
+                }
+            }
+            InjectField(existing, "_candidateRoot", CandidateRoot);
+            InjectField(existing, "_slotPrefab", _candidateSlotPrefab);
+            InjectField(existing, "_blockCellPrefab", _blockCellPrefab);
+
+            // 形状库
+            if (ActiveConfig?.Shapes != null)
+                existing.SetShapeDatabase(ActiveConfig.Shapes);
+
+            existing.Configure(ActiveConfig?.Layout, ActiveConfig?.Theme);
+        }
+
+        private void CreateScoreManager()
+        {
+            var sm = FindFirstObjectByType<ScoreManager>();
+            if (sm == null)
+            {
+                var go = new GameObject("[ScoreManager]");
+                sm = go.AddComponent<ScoreManager>();
+            }
+            sm.SetConfig(_scoreConfig);
+        }
+
+        private void CreateGameManager()
+        {
+            if (FindFirstObjectByType<GameManager>() == null)
+            {
+                var go = new GameObject("[GameManager]");
+                go.AddComponent<GameManager>();
+            }
+        }
+
+        // ==================== UI ====================
 
         private void CreateUI()
         {
-            // 创建 Canvas
-            var canvasGo = new GameObject("GameCanvas");
-            var canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 100;
+            // HUD: 分数 / 最高分 进 HudSafeRoot
+            var scoreGo = InstantiateInto(_scoreDisplayPrefab, HudSafeRoot, "ScoreDisplay");
+            EnsureDigitSprites(scoreGo);
+            var highScoreGo = InstantiateInto(_highScoreDisplayPrefab, HudSafeRoot, "HighScoreDisplay");
+            EnsureDigitSprites(highScoreGo);
 
-            var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080, 1920);
-            scaler.matchWidthOrHeight = 0.5f;
+            // OverlayCanvas: GameOverPanel
+            var goPanel = InstantiateInto(_gameOverPanelPrefab, OverlaySafeRoot, "GameOverPanel");
+            if (goPanel != null) goPanel.SetActive(false);
 
-            canvasGo.AddComponent<GraphicRaycaster>();
-
-            // EventSystem
-            if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
-            {
-                var esGo = new GameObject("EventSystem");
-                esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
-#if ENABLE_INPUT_SYSTEM
-                esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
-#else
-                esGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-#endif
-            }
-
-            // --- 分数显示（从 Prefab 实例化） ---
-            GameObject scoreDisplayGo = InstantiatePrefab(_scoreDisplayPrefab, canvasGo.transform, "ScoreDisplay");
-            EnsureDigitSprites(scoreDisplayGo);
-
-            // --- 最高分显示（从 Prefab 实例化） ---
-            GameObject highScoreDisplayGo = InstantiatePrefab(_highScoreDisplayPrefab, canvasGo.transform, "HighScoreDisplay");
-            EnsureDigitSprites(highScoreDisplayGo);
-
-            // --- 游戏结束面板（从 Prefab 实例化） ---
-            GameObject gameOverPanel = InstantiatePrefab(_gameOverPanelPrefab, canvasGo.transform, "GameOverPanel");
-            if (gameOverPanel != null) gameOverPanel.SetActive(false);
-
-            // --- 挂载 GameUI / 游戏内流程 UI 脚本 ---
-            var gameUI = canvasGo.AddComponent<GameUI>();
-            canvasGo.AddComponent<GameFlowUI>();
+            // GameUI / GameFlowUI 挂在 HudCanvas 根
+            var gameUI = HudCanvas.gameObject.AddComponent<GameUI>();
+            HudCanvas.gameObject.AddComponent<GameFlowUI>();
 
             if (FindFirstObjectByType<GameplayAudioBinder>() == null)
             {
-                var binderGo = new GameObject("[GameplayAudioBinder]");
-                binderGo.AddComponent<GameplayAudioBinder>();
+                var go = new GameObject("[GameplayAudioBinder]");
+                go.AddComponent<GameplayAudioBinder>();
             }
 
-            SetPrivateField(gameUI, "_scoreDisplay", scoreDisplayGo?.GetComponent<NumberImageDisplay>());
-            SetPrivateField(gameUI, "_highScoreDisplay", highScoreDisplayGo?.GetComponent<NumberImageDisplay>());
-            SetPrivateField(gameUI, "_gameOverPanel", gameOverPanel);
-            SetPrivateField(gameUI, "_finalScoreText", gameOverPanel?.transform.Find("FinalScoreText")?.GetComponent<Text>());
-            SetPrivateField(gameUI, "_restartButton", gameOverPanel?.transform.Find("RestartButton")?.GetComponent<Button>());
+            InjectField(gameUI, "_scoreDisplay", scoreGo?.GetComponent<NumberImageDisplay>());
+            InjectField(gameUI, "_highScoreDisplay", highScoreGo?.GetComponent<NumberImageDisplay>());
+            InjectField(gameUI, "_gameOverPanel", goPanel);
+            if (goPanel != null)
+            {
+                InjectField(gameUI, "_finalScoreText", goPanel.transform.Find("FinalScoreText")?.GetComponent<Text>());
+                InjectField(gameUI, "_restartButton", goPanel.transform.Find("RestartButton")?.GetComponent<Button>());
+            }
 
+            // 飘字管理器:挂在 HudCanvas
+            var floating = HudCanvas.gameObject.AddComponent<FloatingScoreManager>();
+            floating.Init(HudCanvas);
+            floating.SetFloatingScorePrefab(_floatingScorePrefab);
+            floating.SetScorePopupPrefab(_scorePopupPrefab);
 
-
-            // --- 得分飘字管理器 ---
-            var floatingMgr = canvasGo.AddComponent<FloatingScoreManager>();
-            floatingMgr.Init(canvas);
-            floatingMgr.SetFloatingScorePrefab(_floatingScorePrefab);
-            floatingMgr.SetScorePopupPrefab(_scorePopupPrefab);
-
-            // 监听计分事件，驱动飘字
             if (Score.ScoreManager.Instance != null)
             {
-                var scoreManager = Score.ScoreManager.Instance;
-
-                // 消除得分：使用新版结构化入队
-                scoreManager.OnLineClearScoreDetail += (lineCount, cellScore, clearComboScore, comboCount) =>
+                var sm = Score.ScoreManager.Instance;
+                sm.OnLineClearScoreDetail += (lineCount, cellScore, clearComboScore, comboCount) =>
                 {
-                    floatingMgr.EnqueueClearScore(comboCount, cellScore, clearComboScore);
-                    floatingMgr.PlayAll();
+                    floating.EnqueueClearScore(comboCount, cellScore, clearComboScore);
+                    floating.PlayAll();
                 };
-
-                // 非消除放置得分
-                scoreManager.OnPlaceScore += (placeScore) =>
+                sm.OnPlaceScore += (placeScore) =>
                 {
-                    floatingMgr.EnqueuePlaceScore(placeScore);
-                    floatingMgr.PlayAll();
+                    floating.EnqueuePlaceScore(placeScore);
+                    floating.PlayAll();
                 };
-
-                // 飘字播完后触发总分跳动（不再使用反射）
-                floatingMgr.OnAllFinished += () =>
+                floating.OnAllFinished += () =>
                 {
                     gameUI.PlayScoreBounce();
                 };
             }
         }
 
-        // ==================== 辅助方法 ====================
-
-        /// <summary>实例化 Prefab 到指定父节点下</summary>
-        private GameObject InstantiatePrefab(GameObject prefab, Transform parent, string fallbackName)
+        private GameObject InstantiateInto(GameObject prefab, Transform parent, string name)
         {
-            if (prefab != null)
+            if (prefab == null)
             {
-                var go = Instantiate(prefab, parent, false);
-                go.name = fallbackName;
-                go.SetActive(true);
-                return go;
+                Debug.LogWarning($"[SceneBootstrap] Prefab 未配置: {name}");
+                return null;
             }
-            Debug.LogWarning($"[SceneBootstrap] Prefab 未配置: {fallbackName}，请在 Inspector 中设置");
-            return null;
+            var go = Instantiate(prefab, parent, false);
+            go.name = name;
+            go.SetActive(true);
+            return go;
         }
 
-        /// <summary>自动加载数字精灵到 NumberImageDisplay（如果 Prefab 没有配置）</summary>
         private void EnsureDigitSprites(GameObject scoreGo)
         {
             if (scoreGo == null) return;
             var display = scoreGo.GetComponent<NumberImageDisplay>();
             if (display == null || display.HasValidSprites) return;
-
             var sprites = new Sprite[10];
-            bool allLoaded = true;
+            bool ok = true;
             for (int i = 0; i <= 9; i++)
             {
                 sprites[i] = Resources.Load<Sprite>($"Digits/SH2_{i}");
-                if (sprites[i] == null) allLoaded = false;
+                if (sprites[i] == null) ok = false;
+            }
+            if (ok) InjectField(display, "_numberSprites", sprites);
+        }
+
+        private static void InjectField(object target, string fieldName, object value)
+        {
+            if (target == null) return;
+            var f = target.GetType().GetField(fieldName,
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (f != null && value != null) f.SetValue(target, value);
+        }
+
+        // ==================== M-R5 自助体系 Manager ====================
+
+        public static RectTransform FxLayer { get; private set; }
+        public static RectTransform FloatingTextLayer { get; private set; }
+
+        private void CreateSelfServiceManagers()
+        {
+            // 反射式按 SO 名查 FxLibrary / FloatingTextLibrary / AudioBindings
+            // (M-R5 阶段 GameConfig.cs 里这三个字段是后加的,我们优先用 Resources 直接加载,避免重新做配置中心)
+            var fxLib = Resources.Load<FxLibrary>("Configs/FxLibrary");
+            var ftLib = Resources.Load<FloatingTextLibrary>("Configs/FloatingTextLibrary");
+            var bindings = Resources.Load<AudioBindings>("Configs/AudioBindings");
+
+            // 1. 在 PlayCanvas 下加 FxLayer(覆盖在棋盘和候选区之上)
+            FxLayer = CreateLayer(PlayCanvas.transform, "FxLayer", siblingLast: true);
+
+            // 2. 在 HudCanvas 下加 FloatingTextLayer(放分数飘字)
+            FloatingTextLayer = CreateLayer(HudCanvas.transform, "FloatingTextLayer", siblingLast: true);
+
+            var tuning = ActiveConfig?.Gameplay;
+
+            // 3. FxManager
+            if (fxLib != null)
+            {
+                var fxGo = new GameObject("[FxManager]");
+                var fx = fxGo.AddComponent<FxManager>();
+                fx.Init(fxLib, tuning, FxLayer);
             }
 
-            if (allLoaded)
-                SetPrivateField(display, "_numberSprites", sprites);
-        }
-
-        private void SetPrivateField(object obj, string fieldName, object value)
-        {
-            if (obj == null) return;
-            var field = obj.GetType().GetField(fieldName,
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (field != null)
-                field.SetValue(obj, value);
-        }
-
-        // ==================== 运行时参数热更新 ====================
-
-#if UNITY_EDITOR
-        private void OnValidate()
-        {
-            ApplyLayoutConfig();
-
-            if (!Application.isPlaying) return;
-
-            UnityEditor.EditorApplication.delayCall += () =>
+            // 4. FloatingTextManager
+            if (ftLib != null)
             {
-                if (this == null) return;
+                var ftGo = new GameObject("[FloatingTextManager]");
+                var ft = ftGo.AddComponent<FloatingTextManager>();
+                ft.Init(ftLib, FloatingTextLayer);
+            }
 
-                // 刷新候选区布局
-                if (BlockSpawner.Instance != null)
-                    BlockSpawner.Instance.RelayoutCandidates();
-            };
+            // 5. GameplayEventAudioBinder
+            if (bindings != null)
+            {
+                var gbGo = new GameObject("[GameplayEventAudioBinder]");
+                var gb = gbGo.AddComponent<GameplayEventAudioBinder>();
+                gb.Init(bindings, tuning);
+            }
         }
-#endif
 
+        private static RectTransform CreateLayer(Transform parent, string name, bool siblingLast)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rt = go.GetComponent<RectTransform>();
+            rt.SetParent(parent, false);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            if (siblingLast) rt.SetAsLastSibling();
+            return rt;
+        }
     }
 }

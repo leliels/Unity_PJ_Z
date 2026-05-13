@@ -13,8 +13,9 @@
 |--------|------|------|
 | M0 项目准备 | ✅ | 文档、目录、美术效果图 |
 | M1 核心原型 | ✅ | 棋盘+方块+拖拽+消除+计分，已验收 |
-| M2 数值体验+换皮 | 🔵 收尾中 | 计分、Prefab 化、美术替换与配置工具等核心能力推进中 |
-| M3 完整玩法 | ⬜ | UI流程+游戏模式+存档+音效 |
+| M2 数值体验+换皮 | ✅ | 计分、Prefab 化、美术替换与配置工具 |
+| **2.0 重构** | ✅ | 配置中心 + 全 Canvas 化 + iOS 多机型适配 + 美术/策划自助体系(M-R1~R7,2026.5.13 完成) |
+| M3 完整玩法 | 🔵 | UI流程+游戏模式+存档+音效(占位已搭,在 2.0 分支基础上推进) |
 | M4 内容填充 | ⬜ | 特效+音效+冒险模式机制 |
 | M5 打磨上线 | ⬜ | Bug修复+适配+上架 |
 
@@ -30,41 +31,53 @@
 - 消除后不下落 | 不支持玩家旋转 | 方块形状由配置工具维护，方向变体作为独立形状随机出现
 - 计分采用 2026-04-30 配置化公式：仅消除计分，排分倍率 + Combo 数 + Combo CD 机制
 - 数据存储 PlayerPrefs | 先做 PC 再移动端
-- 棋盘代码动态生成（非 Tilemap）| M2 开始 Prefab 化
+- **2.0 重构后渲染统一 UGUI**(背景/棋盘/候选/拖拽/HUD 全部 Canvas + Image),不再用 SpriteRenderer。坐标换算走 `BoardLayout.ScreenToCell`,iOS 多机型自适配。
+- **配置中心化**:`Assets/Resources/Configs/GameConfig.asset` 是唯一总入口,内部引用 11 份子 SO。代码不再有"棋盘格大小""候选区位置"等硬编码。
+- **美术/策划自助**:特效/震屏/飘字/音效全部由 SO 配置驱动(FxLibrary / FloatingTextLibrary / AudioBindings),改这些不进代码。
 
 ## 项目目录结构
 
 ```
 Unity_PJ_Z/
-├── CODEBUDDY.md              ← 你正在读的文件（项目索引）
+├── CLAUDE.md                  ← 你正在读的文件（项目索引）
 ├── README.md                  # Git 仓库首页（极简）
 ├── Assets/
+│   ├── _美术与策划速查.md       ← **【美术/策划入口】1 屏速查,改 X 该改哪个 .asset**
 │   ├── Scripts/               # C# 脚本（按模块分目录）
-│   │   ├── Core/              # 核心启动、状态与全局管理
-│   │   ├── Board/             # 棋盘、放置、消除检测
-│   │   ├── Block/             # 方块数据、生成、拖拽与形状配置
+│   │   ├── Config/            # **2.0 新增:配置 SO 类型(GameConfig/LayoutConfig 等)**
+│   │   ├── Core/              # 核心启动、状态、GameplayEvents 事件总线
+│   │   ├── Board/             # 棋盘、UGUI 渲染、BoardLayout 坐标工具
+│   │   ├── Block/             # 方块数据、UGUI 候选区、UGUI 拖拽
 │   │   ├── Score/             # 计分配置、计算与状态管理
-│   │   ├── UI/                # HUD、分数显示、飘字与面板
+│   │   ├── UI/                # HUD、分数显示、飘字、SafeAreaFitter
+│   │   ├── Audio/             # 音效系统、AudioBindings 事件绑定
+│   │   ├── Feedback/          # FxManager 特效与震屏
+│   │   ├── Mode/Save/         # 模式系统、存档
 │   │   ├── Utils/             # 通用工具
-│   │   └── Editor/            # 编辑器工具（不打包）
-│   ├── Scenes/Boot.unity      # 游戏主场景（挂 SceneBootstrap 启动一切）
+│   │   └── Editor/            # 编辑器工具(BlockPuzzle 菜单全在这)
+│   ├── Scenes/
+│   │   ├── Title.unity        # Title 启动场景(Build index 0)
+│   │   └── Boot.unity         # 对局场景(Build index 1,挂 SceneBootstrap)
 │   ├── Resources/
-│   │   ├── Art/               # 运行时加载的美术资源（Blocks/Board/Backgrounds/UI）
-│   │   ├── Configs/           # 运行时加载的配置资源（ScoreConfig）
+│   │   ├── Art/               # 运行时美术资源,各子目录有 _README.md
+│   │   ├── Configs/           # **配置 .asset 全部在这里,GameConfig.asset 是入口**
 │   │   └── Digits/            # 数字精灵图（SH1/SH2 系列）
-│   ├── Configs/               # 编辑器维护的配置资产（BlockShapeDatabase 等）
+│   ├── Configs/               # 编辑器维护的配置(BlockShapeDatabase 备份)
 │   ├── Art/拆分资源/           # 美术原始切图（效果图 + UI 素材）
-│   ├── Prefabs/               # 预制体
-│   │   ├── Block/             # BlockCell
-│   │   ├── Board/             # Cell, Preview, CandidateSlot, [BoardManager], [BlockSpawner]
-│   │   └── UI/                # FloatingScore, GameOverPanel, ScoreDisplay, HighScoreDisplay 等
+│   ├── Prefabs/               # 预制体(2.0 重构:Block/Board/UI 等)
 │   └── Settings/              # URP 渲染设置
 ├── Packages/                  # Unity 包管理
 ├── ProjectSettings/           # 项目设置
 └── 设计文档/                   # 设计文档目录（见下方索引）
-    ├── 会议内容/               # 开发人员自己用的一些文档，ai不用看
+    ├── 会议内容/               # 开发人员自己用的一些文档,ai 不用看
     └── 操作指南/               # 操作类使用说明文档
 ```
+
+## 配置中心入口（重要）
+
+- **菜单 `BlockPuzzle/游戏配置中心`**:打开 GameConfig.asset,横排展示所有子配置 + "打开"按钮直达
+- **`Assets/_美术与策划速查.md`**:美术/策划同学的 1 屏指引,200 字看完
+- **菜单 `BlockPuzzle/AI 工具/创建自助体系配置 (FxLibrary 等)`**:一键生成 M-R5 的 3 份空白 SO
 
 ## 设计文档索引
 
@@ -93,11 +106,13 @@ Unity_PJ_Z/
 
 ## 架构要点
 
-- **SceneBootstrap**（Boot 场景唯一挂载脚本）负责启动一切：创建 Manager、创建 UI、配置相机
-- **Manager 单例模式**：GameManager → BoardManager / BlockSpawner / ScoreManager / GameUI
-- **通信方式**：C# 原生 event/Action，不用消息总线
-- **Prefab 化已大量完成**（M2 任务5）：棋盘格子、方块、候选区、得分飘字、分数显示等均已有 Prefab，可在 Inspector 调整参数
-- 代码中保留 fallback（Prefab/资源为 null 时走代码生成路径，确保不崩溃）
+- **Title.unity**(Build index 0)→ **Boot.unity**(对局场景,Build index 1)。开发者也可直接打 Boot 进游戏。
+- **SceneBootstrap**(Boot 场景唯一挂载脚本)负责启动一切:加载 GameConfig → 搭 4 Canvas → 创建 Manager → 注入配置
+- **4 Canvas 层**:BackgroundCanvas / PlayCanvas / HudCanvas / OverlayCanvas,统一 ScaleWithScreenSize match=0.5
+- **棋盘渲染**:UGUI Image,坐标走 `BoardLayout.ScreenToCell`,屏幕宽高比变 → 棋盘自动等比缩放
+- **Manager 单例**:GameManager → BoardManager / BlockSpawner / ScoreManager / GameUI / FxManager / FloatingTextManager / GameplayEventAudioBinder
+- **通信方式**:`GameplayEvents` 静态事件总线 + 各 Manager 自身的 C# event(原有 OnLineCleared 等保留兼容)
+- **代码中保留 fallback**:Prefab/资源为 null 时走代码生成路径,确保不崩溃
 
 ## 开发规则
 

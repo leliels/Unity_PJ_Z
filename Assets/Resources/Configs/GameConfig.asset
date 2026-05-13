@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85a3a9bfb2992e44298ce1d301c9ce1f, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::BlockPuzzle.Config.GameConfig
+  _score: {fileID: 11400000, guid: 639b64de0427eef4eb472683b33f7a14, type: 2}
+  _shapes: {fileID: 11400000, guid: ca275b3d6618b8d4386b4163fd0d35f1, type: 2}
+  _layout: {fileID: 11400000, guid: 73f045674b49c9840887733074b439a8, type: 2}
+  _theme: {fileID: 11400000, guid: 1ceb5f74e3729e340a81e16bc12242c2, type: 2}
+  _gameplay: {fileID: 11400000, guid: 6489d81ddb4dded45bd5cd6856e9ab89, type: 2}
+  _modeCatalog: {fileID: 11400000, guid: 80b16678ac54561489080759920fa8d0, type: 2}
+  _defaultMode: {fileID: 11400000, guid: 0a604eb446cd15840956297a74a6a9e4, type: 2}
+  _audioLibrary: {fileID: 11400000, guid: 097706293d309c341a4b0c9c26e0af8c, type: 2}

@@ -45,6 +45,7 @@ namespace BlockPuzzle.Core
             _clearedThisTurn = false;
             RegisterEvents();
             SetState(GameState.Playing);
+            GameplayEvents.Raise(GameplayEventId.GameStarted);
         }
 
         /// <summary>重新开始游戏</summary>
