@@ -89,6 +89,7 @@ Unity_PJ_Z/
 | @设计文档/操作指南/SpriteAtlas图集打包指南.md | 数字图集的生成和使用方式 |
 | @设计文档/操作指南/方块形状配置工具使用指南.md | 方块形状配置工具的设计说明与使用流程 |
 | @设计文档/操作指南/M3音效与反馈配置指南.md | M3 音效、按钮触发、玩法事件音效和震动/抖动反馈配置 |
+| @设计文档/操作指南/iOS打包指南.md | iOS 打包完整流程（Windows 构建 + Mac 签名）、开发者账号说明 |
 
 ## 架构要点
 
@@ -107,3 +108,66 @@ Unity_PJ_Z/
 - **会议内容 ≠ 正式文档**：`设计文档/会议内容/` 仅为原始记录，结论必须同步到正式文档才生效。
 - **编辑器菜单规范**：所有编辑器工具放在 `BlockPuzzle/` 顶层菜单下，不用 `Tools/`。人工日常工具放 `BlockPuzzle/xxx`，AI 一次性生成工具放 `BlockPuzzle/AI 工具/xxx`。详见 `03-技术架构文档.md § 12`。
 
+
+# CLAUDE.md — 12-rule template
+
+These rules apply to every task in this project unless explicitly overridden.
+Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
+
+## Rule 1 — Think Before Coding
+State assumptions explicitly. If uncertain, ask rather than guess.
+Present multiple interpretations when ambiguity exists.
+Push back when a simpler approach exists.
+Stop when confused. Name what's unclear.
+
+## Rule 2 — Simplicity First
+Minimum code that solves the problem. Nothing speculative.
+No features beyond what was asked. No abstractions for single-use code.
+Test: would a senior engineer say this is overcomplicated? If yes, simplify.
+
+## Rule 3 — Surgical Changes
+Touch only what you must. Clean up only your own mess.
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor what isn't broken. Match existing style.
+
+## Rule 4 — Goal-Driven Execution
+Define success criteria. Loop until verified.
+Don't follow steps. Define success and iterate.
+Strong success criteria let you loop independently.
+
+## Rule 5 — Use the model only for judgment calls
+Use me for: classification, drafting, summarization, extraction.
+Do NOT use me for: routing, retries, deterministic transforms.
+If code can answer, code answers.
+
+## Rule 6 — Token budgets are not advisory
+Per-task: 4,000 tokens. Per-session: 30,000 tokens.
+If approaching budget, summarize and start fresh.
+Surface the breach. Do not silently overrun.
+
+## Rule 7 — Surface conflicts, don't average them
+If two patterns contradict, pick one (more recent / more tested).
+Explain why. Flag the other for cleanup.
+Don't blend conflicting patterns.
+
+## Rule 8 — Read before you write
+Before adding code, read exports, immediate callers, shared utilities.
+"Looks orthogonal" is dangerous. If unsure why code is structured a way, ask.
+
+## Rule 9 — Tests verify intent, not just behavior
+Tests must encode WHY behavior matters, not just WHAT it does.
+A test that can't fail when business logic changes is wrong.
+
+## Rule 10 — Checkpoint after every significant step
+Summarize what was done, what's verified, what's left.
+Don't continue from a state you can't describe back.
+If you lose track, stop and restate.
+
+## Rule 11 — Match the codebase's conventions, even if you disagree
+Conformance > taste inside the codebase.
+If you genuinely think a convention is harmful, surface it. Don't fork silently.
+
+## Rule 12 — Fail loud
+"Completed" is wrong if anything was skipped silently.
+"Tests pass" is wrong if any were skipped.
+Default to surfacing uncertainty, not hiding it.
