@@ -8,7 +8,7 @@ namespace BlockPuzzle.Score
     [CreateAssetMenu(fileName = "ScoreConfig", menuName = "BlockPuzzle/计分配置")]
     public sealed class ScoreConfig : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/ScoreConfig";
+        public const string ResourcesPath = "Configs/01_Gameplay/ScoreConfig";
 
         [Header("放置计分")]
         [SerializeField]

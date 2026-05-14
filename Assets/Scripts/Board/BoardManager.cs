@@ -30,10 +30,16 @@ namespace BlockPuzzle.Board
         [Tooltip("棋盘根 RectTransform。挂在 PlayCanvas 下,通常带 AspectRatioFitter 锁 1:1。")]
         [SerializeField] private RectTransform _boardRoot;
 
-        [Tooltip("单元格 Prefab(必须含 Image 组件)。运行时实例化 64 个。")]
+        [Tooltip("单元格 Prefab(背景层,BoardBackground)。运行时实例化 64 个。由 SceneBootstrap 注入,无需手动设置。")]
+        [HideInInspector]
         [SerializeField] private GameObject _uiCellPrefab;
 
-        [Tooltip("放置预览/消除高亮 Prefab(含 Image 组件)。可选,为空时用 UICell 同一份 Prefab。")]
+        [Tooltip("逻辑格子 Prefab(Cells 层)。放方块后显示的格子外观。为空时 fallback 为纯 Image。由 SceneBootstrap 注入。")]
+        [HideInInspector]
+        [SerializeField] private GameObject _uiLogicCellPrefab;
+
+        [Tooltip("放置预览/消除高亮 Prefab(含 Image 组件)。由 SceneBootstrap 注入,无需手动设置。")]
+        [HideInInspector]
         [SerializeField] private GameObject _uiPreviewPrefab;
 
         // ==================== 事件 ====================
@@ -45,6 +51,7 @@ namespace BlockPuzzle.Board
         private bool[,] _grid;
         private Image[,] _cellImages;
         private Color[,] _cellColors;
+        private Color _emptyColor;
 
         // 三个层:格子层、消除高亮层、放置预览层(后者覆盖前者)
         private RectTransform _cellsContainer;
@@ -72,6 +79,16 @@ namespace BlockPuzzle.Board
             _theme = theme;
         }
 
+        /// <summary>
+        /// 重建 BoardLayout 对象(让 LayoutConfig 最新值生效)。
+        /// 用于 RuntimeConfigApplier 在 Play 中实时重应用配置。
+        /// </summary>
+        public void RebuildLayout()
+        {
+            if (_boardRoot != null)
+                _layout = new BoardLayout(_boardRoot, _layoutConfig);
+        }
+
         public void Init()
         {
             if (_boardRoot == null)
@@ -95,6 +112,7 @@ namespace BlockPuzzle.Board
             UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(_boardRoot);
 
             EnsureContainers();
+            CreateBoardBackground();
             CreateCells();
 
             // 二次保险:有些情况下 ForceRebuildLayoutImmediate 不能在 Awake 同帧解析所有父级,
@@ -106,13 +124,34 @@ namespace BlockPuzzle.Board
         private System.Collections.IEnumerator NextFrameRelayout()
         {
             yield return null;
+            // 等一帧后 Canvas/AspectRatioFitter 才完成布局,重新应用 BoardRoot 偏移和 Cell 尺寸
+            ReapplyBoardRootOffset();
             UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(_boardRoot);
             RelayoutCells();
         }
 
         /// <summary>
+        /// 根据 LayoutConfig 的 BoardOffsetXRatio/YRatio 重新计算 BoardRoot 的 anchoredPosition。
+        /// 在首帧 Canvas rect 未就绪时调用无效,应在下一帧调用。
+        /// </summary>
+        private void ReapplyBoardRootOffset()
+        {
+            if (_boardRoot == null || _layoutConfig == null) return;
+            var canvas = _boardRoot.GetComponentInParent<Canvas>();
+            if (canvas == null) return;
+            var canvasRt = (RectTransform)canvas.transform;
+            float screenW = canvasRt.rect.width;
+            float screenH = canvasRt.rect.height;
+            if (screenW <= 0f || screenH <= 0f) return; // 仍未就绪,放弃
+            float offX = _layoutConfig.BoardOffsetXRatio * screenW;
+            float offY = _layoutConfig.BoardOffsetYRatio * screenH;
+            _boardRoot.anchoredPosition = new Vector2(offX, offY);
+        }
+
+        /// <summary>
         /// 仅重新摆放已有 cell 的位置和大小,不销毁不重建。
         /// 配置(LayoutConfig)修改后调用,实现实时生效。
+        /// 同时同步刷新 BoardBackground 下 BgCell 的位置和大小,保证两层一致。
         /// </summary>
         public void RelayoutCells()
         {
@@ -126,6 +165,27 @@ namespace BlockPuzzle.Board
                 var img = _cellImages[col, row];
                 if (img != null) SetCellRect(img.rectTransform, col, row, size);
             }
+
+            // 同步刷新背景格子(BgCell)的位置和大小
+            RelayoutBackground(size, cols, rows);
+        }
+
+        private void RelayoutBackground(float size, int cols, int rows)
+        {
+            if (_bgContainer == null) return;
+            int index = 0;
+            for (int col = 0; col < cols; col++)
+            for (int row = 0; row < rows; row++)
+            {
+                if (index >= _bgContainer.childCount) return;
+                var rt = _bgContainer.GetChild(index) as RectTransform;
+                if (rt != null)
+                {
+                    rt.sizeDelta = new Vector2(size, size);
+                    rt.anchoredPosition = _layout.CellToLocal(col, row);
+                }
+                index++;
+            }
         }
 
         public void ClearBoard()
@@ -135,9 +195,9 @@ namespace BlockPuzzle.Board
 
         private void EnsureContainers()
         {
-            _cellsContainer = EnsureChildContainer("Cells", 0);
-            _highlightContainer = EnsureChildContainer("ClearHighlights", 1);
-            _previewContainer = EnsureChildContainer("PlacementPreview", 2);
+            _cellsContainer = EnsureChildContainer("Cells", 1);
+            _highlightContainer = EnsureChildContainer("ClearHighlights", 2);
+            _previewContainer = EnsureChildContainer("PlacementPreview", 3);
         }
 
         private RectTransform EnsureChildContainer(string name, int siblingIndex)
@@ -193,7 +253,60 @@ namespace BlockPuzzle.Board
             _previewContainer = null;
         }
 
-        // ==================== 创建格子 ====================
+        // ==================== 棋盘背景格子(静态底层,不参与逻辑) ====================
+
+        private RectTransform _bgContainer;
+
+        /// <summary>
+        /// 用 UICell Prefab 在 Cells 层下方生成一层纯视觉的棋盘底格。
+        /// 这一层永远不变，只负责显示棋盘外观。美术在 UICell Prefab 上改精灵/颜色。
+        /// </summary>
+        private void CreateBoardBackground()
+        {
+            if (_uiCellPrefab == null) return; // 没有 Prefab 则跳过，不画背景
+
+            // 创建容器,放在 sibling 0(最底层)
+            if (_bgContainer != null) DestroyImmediate(_bgContainer.gameObject);
+            var bgGo = new GameObject("BoardBackground", typeof(RectTransform));
+            _bgContainer = bgGo.GetComponent<RectTransform>();
+            _bgContainer.SetParent(_boardRoot, false);
+            _bgContainer.anchorMin = Vector2.zero;
+            _bgContainer.anchorMax = Vector2.one;
+            _bgContainer.offsetMin = Vector2.zero;
+            _bgContainer.offsetMax = Vector2.zero;
+            _bgContainer.SetSiblingIndex(0);
+            // 容器不接 raycast
+            var containerImg = bgGo.AddComponent<Image>();
+            containerImg.color = Color.clear;
+            containerImg.raycastTarget = false;
+
+            int cols = _layout.Cols;
+            int rows = _layout.Rows;
+            float size = _layout.CellSize;
+
+            for (int col = 0; col < cols; col++)
+            {
+                for (int row = 0; row < rows; row++)
+                {
+                    var go = Instantiate(_uiCellPrefab, _bgContainer, false);
+                    go.name = $"BgCell_{col}_{row}";
+                    var img = go.GetComponent<Image>();
+                    if (img != null) img.raycastTarget = false;
+                    var rt = go.GetComponent<RectTransform>();
+                    if (rt != null)
+                    {
+                        rt.anchorMin = new Vector2(0.5f, 0.5f);
+                        rt.anchorMax = new Vector2(0.5f, 0.5f);
+                        rt.pivot = new Vector2(0.5f, 0.5f);
+                        rt.sizeDelta = new Vector2(size, size);
+                        rt.anchoredPosition = _layout.CellToLocal(col, row);
+                        rt.localScale = Vector3.one;
+                    }
+                }
+            }
+        }
+
+        // ==================== 创建格子(逻辑层,放方块后才显示颜色) ====================
 
         private void CreateCells()
         {
@@ -201,27 +314,21 @@ namespace BlockPuzzle.Board
             int rows = _layout.Rows;
             float size = _layout.CellSize;
 
-            Color emptyColor = _theme != null ? _theme.CellEmptyColor : Constants.CellEmptyColor;
-            // 如果策划在 UIThemeConfig 把 CellEmptyColor 配成了完全透明(alpha<0.01),
-            // 用一个轻微可见的默认底色,确保玩家看得到棋盘范围(原 bug:进游戏看不到棋盘)。
-            if (emptyColor.a < 0.01f)
-                emptyColor = new Color(1f, 1f, 1f, 0.12f);
-
-            // 加载棋盘格底图(brd_cell.png),让格子有美术质感而非纯色块
-            var cellSprite = Utils.SpriteUtils.CellSprite;
+            // PlayCanvas 里的 Cells 层：空格子完全透明，只有放上方块才显示颜色。
+            // 棋盘背景底格由 UICell Prefab 在 BoardBackground 层负责渲染。
+            _emptyColor = Color.clear;
 
             for (int col = 0; col < cols; col++)
             {
                 for (int row = 0; row < rows; row++)
                 {
-                    var img = CreateUIImage(_cellsContainer, $"Cell_{col}_{row}", _uiCellPrefab);
+                    var img = CreateUIImage(_cellsContainer, $"Cell_{col}_{row}", _uiLogicCellPrefab);
                     img.raycastTarget = false;
-                    if (img.sprite == null && cellSprite != null) img.sprite = cellSprite;
                     SetCellRect(img.rectTransform, col, row, size);
-                    img.color = emptyColor;
+                    img.color = _emptyColor;
 
                     _cellImages[col, row] = img;
-                    _cellColors[col, row] = emptyColor;
+                    _cellColors[col, row] = _emptyColor;
                 }
             }
         }
@@ -308,9 +415,7 @@ namespace BlockPuzzle.Board
             int totalLines = fullRows.Count + fullCols.Count;
             if (totalLines > 0)
             {
-                Color emptyColor = _theme != null ? _theme.CellEmptyColor : Constants.CellEmptyColor;
-                if (emptyColor.a < 0.01f) emptyColor = new Color(1f, 1f, 1f, 0.12f);
-                var cellSprite = Utils.SpriteUtils.CellSprite;
+                var cellSprite = _uiCellPrefab == null ? Utils.SpriteUtils.CellSprite : null;
                 var clearedCells = MatchChecker.ClearLines(_grid, fullRows, fullCols);
                 Vector2 clearScreen = ClearCenterToScreen(clearedCells);
                 foreach (var pos in clearedCells)
@@ -318,9 +423,9 @@ namespace BlockPuzzle.Board
                     if (_cellImages[pos.x, pos.y] != null)
                     {
                         if (cellSprite != null) _cellImages[pos.x, pos.y].sprite = cellSprite;
-                        _cellImages[pos.x, pos.y].color = emptyColor;
+                        _cellImages[pos.x, pos.y].color = _emptyColor;
                     }
-                    _cellColors[pos.x, pos.y] = emptyColor;
+                    _cellColors[pos.x, pos.y] = _emptyColor;
                 }
                 OnLinesCleared?.Invoke(totalLines);
                 GameplayEvents.Raise(GameplayEventId.LineCleared,

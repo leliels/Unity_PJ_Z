@@ -17,7 +17,7 @@ namespace BlockPuzzle.Config
     [CreateAssetMenu(fileName = "FxLibrary", menuName = "BlockPuzzle/游戏配置/特效与震屏库")]
     public sealed class FxLibrary : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/FxLibrary";
+        public const string ResourcesPath = "Configs/02_Feel/FxLibrary";
 
         public enum SpawnAnchor
         {

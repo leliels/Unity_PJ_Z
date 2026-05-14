@@ -5,7 +5,7 @@ namespace BlockPuzzle.Mode
     [CreateAssetMenu(fileName = "ModeCatalog", menuName = "BlockPuzzle/Mode/Mode Catalog")]
     public class ModeCatalog : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/ModeCatalog";
+        public const string ResourcesPath = "Configs/01_Gameplay/ModeCatalog";
 
         [SerializeField] private GameModeConfig[] _modes;
 

@@ -29,24 +29,24 @@ namespace BlockPuzzle.EditorTools
             AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Resources/Audio/SFX/snd_placeholder_click.wav");
             AudioClip bgm = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Resources/Audio/BGM/bgm_placeholder_loop.wav");
 
-            AudioCue cue = LoadOrCreate<AudioCue>("Assets/Resources/Configs/PlaceholderAudioCue.asset");
+            AudioCue cue = LoadOrCreate<AudioCue>("Assets/Resources/Configs/02_Feel/PlaceholderAudioCue.asset");
             cue.EditorSetValues(new[] { clip }, 0.85f, 0f, new Vector2(0.95f, 1.05f), false, 0.03f, true);
             EditorUtility.SetDirty(cue);
 
-            AudioLibrary library = LoadOrCreate<AudioLibrary>("Assets/Resources/Configs/AudioLibrary.asset");
+            AudioLibrary library = LoadOrCreate<AudioLibrary>("Assets/Resources/Configs/02_Feel/AudioLibrary.asset");
             library.EditorSetAll(cue);
             library.EditorSetBgm(bgm, bgm);
             EditorUtility.SetDirty(library);
 
-            GameModeConfig traditional = LoadOrCreate<GameModeConfig>("Assets/Resources/Configs/Mode_Traditional.asset");
+            GameModeConfig traditional = LoadOrCreate<GameModeConfig>("Assets/Resources/Configs/01_Gameplay/Mode_Traditional.asset");
             traditional.EditorSetValues(GameModeConfig.TraditionalId, "传统模式", true, false, "Boot", 0, "进入当前已实现玩法");
             EditorUtility.SetDirty(traditional);
 
-            GameModeConfig adventure = LoadOrCreate<GameModeConfig>("Assets/Resources/Configs/Mode_Adventure.asset");
+            GameModeConfig adventure = LoadOrCreate<GameModeConfig>("Assets/Resources/Configs/01_Gameplay/Mode_Adventure.asset");
             adventure.EditorSetValues(GameModeConfig.AdventureId, "冒险模式", true, true, string.Empty, 10, "冒险模式敬请期待");
             EditorUtility.SetDirty(adventure);
 
-            ModeCatalog catalog = LoadOrCreate<ModeCatalog>("Assets/Resources/Configs/ModeCatalog.asset");
+            ModeCatalog catalog = LoadOrCreate<ModeCatalog>("Assets/Resources/Configs/01_Gameplay/ModeCatalog.asset");
             catalog.EditorSetModes(new[] { traditional, adventure });
             EditorUtility.SetDirty(catalog);
 

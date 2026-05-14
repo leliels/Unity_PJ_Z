@@ -78,9 +78,9 @@ namespace BlockPuzzle.EditorTools
             TryAssign(so, "_defaultMode", defaultMode);
 
             // 同步创建 LayoutConfig / UIThemeConfig / GameplayTuning(M-R1 自带的三份新 SO)
-            TryAssign(so, "_layout", CreateOrLoadAsset<LayoutConfig>("Assets/Resources/Configs/LayoutConfig.asset"));
-            TryAssign(so, "_theme", CreateOrLoadAsset<UIThemeConfig>("Assets/Resources/Configs/UIThemeConfig.asset"));
-            TryAssign(so, "_gameplay", CreateOrLoadAsset<GameplayTuning>("Assets/Resources/Configs/GameplayTuning.asset"));
+            TryAssign(so, "_layout", CreateOrLoadAsset<LayoutConfig>("Assets/Resources/Configs/01_Gameplay/LayoutConfig.asset"));
+            TryAssign(so, "_theme", CreateOrLoadAsset<UIThemeConfig>("Assets/Resources/Configs/02_Feel/UIThemeConfig.asset"));
+            TryAssign(so, "_gameplay", CreateOrLoadAsset<GameplayTuning>("Assets/Resources/Configs/01_Gameplay/GameplayTuning.asset"));
 
             so.ApplyModifiedProperties();
             EditorUtility.SetDirty(config);

@@ -9,7 +9,7 @@ namespace BlockPuzzle.Config
     [CreateAssetMenu(fileName = "UIThemeConfig", menuName = "BlockPuzzle/游戏配置/UI 主题")]
     public sealed class UIThemeConfig : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/UIThemeConfig";
+        public const string ResourcesPath = "Configs/02_Feel/UIThemeConfig";
 
         public enum SafeAreaPolicy
         {

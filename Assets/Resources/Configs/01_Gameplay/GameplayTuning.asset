@@ -17,3 +17,6 @@ MonoBehaviour:
   _enableBgm: 1
   _gameOverDelay: 0.5
   _lowOptionWarningThreshold: 1
+  _dragOffsetXInCells: 0
+  _dragOffsetYInCells: 1.5
+  _snapTolerance: 0

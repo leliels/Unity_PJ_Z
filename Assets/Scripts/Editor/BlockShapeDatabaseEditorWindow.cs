@@ -9,7 +9,7 @@ using BlockPuzzle.Utils;
 public sealed class BlockShapeDatabaseEditorWindow : EditorWindow
 {
     private const string WindowTitle = "方块形状配置器";
-    private const string DefaultFolder = "Assets/Configs/BlockShapes";
+    private const string DefaultFolder = "Assets/Resources/Configs/01_Gameplay";
     private const string BlockSpawnerPrefabPath = "Assets/Prefabs/Board/[BlockSpawner].prefab";
 
     private BlockShapeDatabase _database;

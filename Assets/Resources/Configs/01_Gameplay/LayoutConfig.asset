@@ -16,9 +16,11 @@ MonoBehaviour:
   _matchWidthOrHeight: 0.5
   _boardRows: 8
   _boardCols: 8
-  _boardMarginTopRatio: 0.18
-  _boardMarginBottomRatio: 0.3
+  _boardMarginTopRatio: 0.1799
+  _boardMarginBottomRatio: 0.29950008
   _cellSpacingRatio: 0.06
+  _boardOffsetXRatio: 0
+  _boardOffsetYRatio: -0.06512
   _candidateSlotCount: 3
   _candidateBlockScale: 0.85
   _candidateBottomMarginRatio: 0.05

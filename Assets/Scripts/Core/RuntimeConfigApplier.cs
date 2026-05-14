@@ -12,8 +12,6 @@ namespace BlockPuzzle.Core
     /// 调用方式:
     ///   1. 菜单 BlockPuzzle/重新应用游戏配置(Play 模式中)
     ///   2. 代码:RuntimeConfigApplier.ReapplyAll()
-    ///   3. 任何 SO 字段在 Inspector 上调整,Unity 会触发 OnValidate,
-    ///      ReapplyAll 也可以从 OnValidate 接力(目前不自动连接,以避免编辑期空跑)
     /// </summary>
     public static class RuntimeConfigApplier
     {
@@ -27,23 +25,43 @@ namespace BlockPuzzle.Core
                 return;
             }
 
+            var layout = config.Layout;
+
             // 1. BoardManager: 重新注入 layout/theme 并重摆格子
             var board = BoardManager.Current ?? BoardManager.Instance;
             if (board != null)
             {
-                board.Configure(config.Layout, config.Theme);
+                board.Configure(layout, config.Theme);
+                // 重建 BoardLayout(让新的 CellSpacingRatio 等生效)
+                board.RebuildLayout();
                 board.RelayoutCells();
             }
 
-            // 2. BlockSpawner: 重新注入,候选区不重建(避免方块掉数据)
+            // 2. 棋盘位置偏移(BoardRoot anchoredPosition)
+            var boardRoot = SceneBootstrap.BoardRoot;
+            if (boardRoot != null && layout != null)
+            {
+                var canvas = boardRoot.GetComponentInParent<Canvas>();
+                if (canvas != null)
+                {
+                    var canvasRt = (RectTransform)canvas.transform;
+                    float screenW = canvasRt.rect.width;
+                    float screenH = canvasRt.rect.height;
+                    float offX = layout.BoardOffsetXRatio * screenW;
+                    float offY = layout.BoardOffsetYRatio * screenH;
+                    boardRoot.anchoredPosition = new Vector2(offX, offY);
+                }
+            }
+
+            // 3. BlockSpawner: 重新注入,候选区不重建(避免方块掉数据)
             var spawner = BlockSpawner.Current ?? BlockSpawner.Instance;
             if (spawner != null)
             {
-                spawner.Configure(config.Layout, config.Theme);
+                spawner.Configure(layout, config.Theme);
                 if (config.Shapes != null) spawner.SetShapeDatabase(config.Shapes);
             }
 
-            Debug.Log("[RuntimeConfigApplier] 已重新应用 GameConfig(棋盘格已按 LayoutConfig/UIThemeConfig 重新摆放)。");
+            Debug.Log("[RuntimeConfigApplier] 已重新应用 GameConfig。");
         }
     }
 }

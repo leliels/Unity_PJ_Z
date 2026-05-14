@@ -42,38 +42,57 @@ namespace BlockPuzzle.Board
             }
         }
 
-        /// <summary>每格的边长(基于 BoardRoot 当前正方形边长的实时尺寸,UI 单位)。</summary>
-        public float CellSize => SquareSide / Cols;
+        /// <summary>每格的边长(基于 BoardRoot 当前正方形边长的实时尺寸,UI 单位)。考虑间距后的纯格子大小。</summary>
+        public float CellSize
+        {
+            get
+            {
+                float spacing = _config != null ? _config.CellSpacingRatio : 0f;
+                // step = cellSize + spacing*cellSize = cellSize*(1+spacing)
+                // totalSteps = Cols * step - spacing*cellSize  (最后一格没有右间距,但简化为全等分)
+                // 简化:squareSide = Cols * step => step = squareSide / Cols => cellSize = step / (1+spacing)
+                float step = SquareSide / Cols;
+                return step / (1f + spacing);
+            }
+        }
 
-        /// <summary>格与格之间的视觉间距(UI 单位)。绝大多数情况下都是 0(用 UICell prefab 自身留白即可)。</summary>
-        public float CellSpacing => _config != null ? CellSize * _config.CellSpacingRatio : 0f;
+        /// <summary>格与格之间的视觉间距(UI 单位)。</summary>
+        public float CellSpacing
+        {
+            get
+            {
+                float spacing = _config != null ? _config.CellSpacingRatio : 0f;
+                return CellSize * spacing;
+            }
+        }
+
+        /// <summary>相邻格子中心之间的距离(= CellSize + CellSpacing)。</summary>
+        public float CellStep => SquareSide / Cols;
 
         /// <summary>
         /// 行列 → BoardRoot 局部 anchoredPosition(以 BoardRoot 中心为 (0,0))。
-        /// 假设 BoardRoot 的 pivot = (0.5, 0.5),anchorMin=anchorMax=(0.5, 0.5)。
         /// 即使 BoardRoot 不是严格正方形,我们也按"内切正方形"居中摆放格子。
         /// </summary>
         public Vector2 CellToLocal(int col, int row)
         {
-            float size = CellSize;
-            float halfBoard = size * Cols * 0.5f;
-            float originX = -halfBoard + size * 0.5f;
-            float originY = -halfBoard + size * 0.5f;
-            return new Vector2(originX + col * size, originY + row * size);
+            float step = CellStep;
+            float halfBoard = step * Cols * 0.5f;
+            float originX = -halfBoard + step * 0.5f;
+            float originY = -halfBoard + step * 0.5f;
+            return new Vector2(originX + col * step, originY + row * step);
         }
 
         /// <summary>
         /// BoardRoot 局部坐标 → 行列(最近格子取整)。
-        /// 越界会返回 (-1,-1) 之类的负数,调用方自行处理。
         /// </summary>
         public Vector2Int LocalToCell(Vector2 localPoint)
         {
-            float size = CellSize;
-            float halfBoard = size * Cols * 0.5f;
+            float step = CellStep;
+            float halfBoard = step * Cols * 0.5f;
             float relX = localPoint.x + halfBoard;
             float relY = localPoint.y + halfBoard;
-            int col = Mathf.FloorToInt(relX / size);
-            int row = Mathf.FloorToInt(relY / size);
+            int col = Mathf.FloorToInt(relX / step);
+            int row = Mathf.FloorToInt(relY / step);
             return new Vector2Int(col, row);
         }
 

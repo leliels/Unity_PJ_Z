@@ -21,7 +21,7 @@ namespace BlockPuzzle.Audio
     [CreateAssetMenu(fileName = "AudioLibrary", menuName = "BlockPuzzle/Audio/Audio Library")]
     public class AudioLibrary : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/AudioLibrary";
+        public const string ResourcesPath = "Configs/02_Feel/AudioLibrary";
 
         [SerializeField] private AudioCue _uiClick;
         [SerializeField] private AudioCue _uiOpen;

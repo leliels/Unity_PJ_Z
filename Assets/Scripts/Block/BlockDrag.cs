@@ -33,6 +33,10 @@ namespace BlockPuzzle.Block
         private Vector2 _originalSizeDelta;
         private Vector2 _originalAnchorMin, _originalAnchorMax, _originalPivot;
 
+        // 子对象(Cells 容器 + 各 Cell)的原始布局,用于拖拽取消后还原
+        private Vector2 _originalCellsSizeDelta;
+        private ChildLayout[] _originalChildLayouts;
+
         private CanvasGroup _canvasGroup;
         private Canvas _rootCanvas;
         private RectTransform _dragLayer;
@@ -212,6 +216,25 @@ namespace BlockPuzzle.Block
             _rt.sizeDelta = _originalSizeDelta;
             _rt.anchoredPosition = _originalAnchoredPos;
             _rt.localScale = _originalScale;
+
+            // 还原 Cells 容器和各 Cell 子对象的布局(ApplyBoardScale 会修改它们)
+            var cellsRt = _rt.Find("Cells") as RectTransform;
+            if (cellsRt != null)
+            {
+                cellsRt.sizeDelta = _originalCellsSizeDelta;
+                if (_originalChildLayouts != null)
+                {
+                    for (int i = 0; i < cellsRt.childCount && i < _originalChildLayouts.Length; i++)
+                    {
+                        var child = cellsRt.GetChild(i) as RectTransform;
+                        if (child != null)
+                        {
+                            child.sizeDelta = _originalChildLayouts[i].SizeDelta;
+                            child.anchoredPosition = _originalChildLayouts[i].AnchoredPosition;
+                        }
+                    }
+                }
+            }
         }
 
         // ==================== 辅助 ====================
@@ -225,25 +248,85 @@ namespace BlockPuzzle.Block
             _originalAnchorMin = _rt.anchorMin;
             _originalAnchorMax = _rt.anchorMax;
             _originalPivot = _rt.pivot;
+
+            // 缓存 Cells 容器和各 Cell 子对象的布局
+            var cellsRt = _rt.Find("Cells") as RectTransform;
+            if (cellsRt != null)
+            {
+                _originalCellsSizeDelta = cellsRt.sizeDelta;
+                _originalChildLayouts = new ChildLayout[cellsRt.childCount];
+                for (int i = 0; i < cellsRt.childCount; i++)
+                {
+                    var child = cellsRt.GetChild(i) as RectTransform;
+                    if (child != null)
+                        _originalChildLayouts[i] = new ChildLayout(child.sizeDelta, child.anchoredPosition);
+                }
+            }
+        }
+
+        private struct ChildLayout
+        {
+            public Vector2 SizeDelta;
+            public Vector2 AnchoredPosition;
+            public ChildLayout(Vector2 size, Vector2 pos) { SizeDelta = size; AnchoredPosition = pos; }
         }
 
         private void ApplyBoardScale()
         {
-            // 拖拽时把方块每格缩放到与棋盘格一致
+            // 目标:拖拽时方块的每个 cell 在屏幕上的视觉大小 = 棋盘格子的实际视觉大小。
+            // 由于方块现在在 DragLayer(PlayCanvas 直接子),而棋盘格在 BoardRoot(可能被 AspectRatioFitter 缩小),
+            // 直接用 boardCellSize 当 sizeDelta 是不对的,需要做坐标系换算。
+            //
+            // 做法:把棋盘一个 CellSize 从 BoardRoot 本地坐标转成 DragLayer 本地坐标的缩放比。
             var board = BoardManager.Instance;
-            if (board == null || board.Layout == null) return;
+            if (board == null || board.Layout == null || board.BoardRoot == null) return;
+
             float boardCellSize = board.Layout.CellSize;
-            // 当前方块每格大小 = "Cells" 容器子节点的 sizeDelta.x
+
+            // 棋盘格在世界坐标系下的像素大小 = boardCellSize * boardRoot.lossyScale.x
+            // DragLayer 在世界坐标系下的像素 = 1 * dragLayer.lossyScale.x
+            var boardRoot = board.BoardRoot;
+            var dragParent = (RectTransform)transform.parent;
+            if (dragParent == null) return;
+
+            float boardWorldScale = boardRoot.lossyScale.x;
+            float dragWorldScale = dragParent.lossyScale.x;
+            if (dragWorldScale <= 0f) return;
+
+            // 一个棋盘格子在 DragLayer 局部坐标系下的 sizeDelta 等效值
+            float cellSizeInDragLayer = boardCellSize * boardWorldScale / dragWorldScale;
+
+            // 重新设置方块内所有 cell 的 sizeDelta,并让方块整体 scale=1
             var cellsRt = _rt.Find("Cells") as RectTransform;
             if (cellsRt == null || cellsRt.childCount == 0) return;
-            var sample = cellsRt.GetChild(0) as RectTransform;
-            if (sample == null || sample.sizeDelta.x <= 0f) return;
 
-            float currentCell = sample.sizeDelta.x * _rt.localScale.x;
-            if (currentCell <= 0f) return;
+            // 重算 contentRt 的 sizeDelta 和各 cell 的 position
+            var (minX, minY, maxX, maxY) = ShapeBounds(_blockData);
+            int widthCells = maxX - minX + 1;
+            int heightCells = maxY - minY + 1;
+            cellsRt.sizeDelta = new Vector2(widthCells * cellSizeInDragLayer, heightCells * cellSizeInDragLayer);
 
-            float scaleFactor = boardCellSize / currentCell;
-            _rt.localScale = _originalScale * scaleFactor;
+            float originX = -widthCells * cellSizeInDragLayer * 0.5f + cellSizeInDragLayer * 0.5f;
+            float originY = -heightCells * cellSizeInDragLayer * 0.5f + cellSizeInDragLayer * 0.5f;
+
+            int i = 0;
+            foreach (var cell in _blockData.Cells)
+            {
+                if (i >= cellsRt.childCount) break;
+                var childRt = cellsRt.GetChild(i) as RectTransform;
+                if (childRt != null)
+                {
+                    childRt.sizeDelta = new Vector2(cellSizeInDragLayer, cellSizeInDragLayer);
+                    childRt.anchoredPosition = new Vector2(
+                        originX + (cell.x - minX) * cellSizeInDragLayer,
+                        originY + (cell.y - minY) * cellSizeInDragLayer);
+                }
+                i++;
+            }
+
+            // 方块根直接 scale=1,大小由 sizeDelta 控制,不需要 scale 变换
+            _rt.localScale = Vector3.one;
+            _rt.sizeDelta = cellsRt.sizeDelta;
         }
 
         private RectTransform ResolveDragLayer()

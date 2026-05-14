@@ -10,7 +10,7 @@ namespace BlockPuzzle.Config
     [CreateAssetMenu(fileName = "LayoutConfig", menuName = "BlockPuzzle/游戏配置/布局配置")]
     public sealed class LayoutConfig : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/LayoutConfig";
+        public const string ResourcesPath = "Configs/01_Gameplay/LayoutConfig";
 
         // ==================== 参考分辨率 ====================
         [Header("参考分辨率")]
@@ -39,9 +39,19 @@ namespace BlockPuzzle.Config
         [Range(0f, 0.5f)]
         [SerializeField] private float _boardMarginBottomRatio = 0.30f;
 
-        [Tooltip("棋盘格子之间的间隔占单元格大小的比例。0.06 表示间隔 = 单元格 × 6%。")]
+        [Tooltip("棋盘格子之间的间隔占单元格大小的比例。0.06 表示间隔 = 单元格 × 6%。0 = 格子紧贴无间距。")]
         [Range(0f, 0.2f)]
         [SerializeField] private float _cellSpacingRatio = 0.06f;
+
+        // ==================== 棋盘位置偏移 ====================
+        [Header("棋盘位置微调")]
+        [Tooltip("棋盘中心水平偏移(占屏幕宽度的百分比)。正值=右移,负值=左移。0=居中。")]
+        [Range(-0.3f, 0.3f)]
+        [SerializeField] private float _boardOffsetXRatio = 0f;
+
+        [Tooltip("棋盘中心垂直偏移(占屏幕高度的百分比)。正值=上移,负值=下移。0=不偏移(由留白决定位置)。")]
+        [Range(-0.3f, 0.3f)]
+        [SerializeField] private float _boardOffsetYRatio = 0f;
 
         // ==================== 候选区 ====================
         [Header("候选区")]
@@ -65,6 +75,8 @@ namespace BlockPuzzle.Config
         public float BoardMarginTopRatio => _boardMarginTopRatio;
         public float BoardMarginBottomRatio => _boardMarginBottomRatio;
         public float CellSpacingRatio => _cellSpacingRatio;
+        public float BoardOffsetXRatio => _boardOffsetXRatio;
+        public float BoardOffsetYRatio => _boardOffsetYRatio;
         public int CandidateSlotCount => _candidateSlotCount;
         public float CandidateBlockScale => _candidateBlockScale;
         public float CandidateBottomMarginRatio => _candidateBottomMarginRatio;

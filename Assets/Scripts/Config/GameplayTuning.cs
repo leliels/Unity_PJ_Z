@@ -9,7 +9,7 @@ namespace BlockPuzzle.Config
     [CreateAssetMenu(fileName = "GameplayTuning", menuName = "BlockPuzzle/游戏配置/玩法微调")]
     public sealed class GameplayTuning : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/GameplayTuning";
+        public const string ResourcesPath = "Configs/01_Gameplay/GameplayTuning";
 
         [Header("反馈开关")]
         [Tooltip("总开关:是否启用震动/抖动反馈。关闭后所有 FxLibrary 中配置的震屏都不生效。")]

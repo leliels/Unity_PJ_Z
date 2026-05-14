@@ -16,9 +16,9 @@ namespace BlockPuzzle.EditorTools
             EnsureFolder("Assets/Resources");
             EnsureFolder("Assets/Resources/Configs");
 
-            CreateIfMissing<FxLibrary>("Assets/Resources/Configs/FxLibrary.asset");
-            CreateIfMissing<FloatingTextLibrary>("Assets/Resources/Configs/FloatingTextLibrary.asset");
-            CreateIfMissing<AudioBindings>("Assets/Resources/Configs/AudioBindings.asset");
+            CreateIfMissing<FxLibrary>("Assets/Resources/Configs/02_Feel/FxLibrary.asset");
+            CreateIfMissing<FloatingTextLibrary>("Assets/Resources/Configs/02_Feel/FloatingTextLibrary.asset");
+            CreateIfMissing<AudioBindings>("Assets/Resources/Configs/02_Feel/AudioBindings.asset");
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();

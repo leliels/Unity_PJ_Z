@@ -9,7 +9,7 @@ namespace BlockPuzzle.Block
     [CreateAssetMenu(fileName = "DefaultBlockShapeDatabase", menuName = "BlockPuzzle/方块形状数据库")]
     public sealed class BlockShapeDatabase : ScriptableObject
     {
-        public const string DefaultAssetPath = "Assets/Configs/BlockShapes/DefaultBlockShapeDatabase.asset";
+        public const string DefaultAssetPath = "Assets/Resources/Configs/01_Gameplay/DefaultBlockShapeDatabase.asset";
 
         [SerializeField] private string _databaseId = "default";
         [SerializeField] private string _displayName = "默认方块库";

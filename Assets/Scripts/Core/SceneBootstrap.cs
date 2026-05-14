@@ -56,8 +56,11 @@ namespace BlockPuzzle.Core
         [SerializeField] private GameObject _scorePopupPrefab;
 
         [Header("棋盘渲染 Prefab")]
-        [Tooltip("UICell Prefab(单格 Image)。为空时代码 fallback。")]
+        [Tooltip("背景格子 Prefab(BoardBackground 层)。控制棋盘底格外观(精灵/颜色/圆角等)。为空时不生成背景格。")]
         [SerializeField] private GameObject _uiCellPrefab;
+
+        [Tooltip("逻辑格子 Prefab(Cells 层)。放上方块后显示的格子外观。为空时代码 fallback(纯 Image,无精灵)。")]
+        [SerializeField] private GameObject _uiLogicCellPrefab;
 
         [Tooltip("UI 放置预览 Prefab(可选,Image 类型)。")]
         [SerializeField] private GameObject _uiPreviewPrefab;
@@ -68,10 +71,6 @@ namespace BlockPuzzle.Core
 
         [Tooltip("方块单格 Prefab(Image)。")]
         [SerializeField] private GameObject _blockCellPrefab;
-
-        [Header("回退用计分配置")]
-        [Tooltip("没有 GameConfig 时使用的 ScoreConfig。GameConfig 存在时会被覆盖。")]
-        [SerializeField] private ScoreConfig _scoreConfig;
 
         // ==================== 全局缓存 ====================
         public static GameConfig ActiveConfig { get; private set; }
@@ -116,7 +115,10 @@ namespace BlockPuzzle.Core
             else
                 Debug.Log("[SceneBootstrap] GameConfig 加载成功:" + ActiveConfig.name);
 
-            if (ActiveConfig.Score != null) _scoreConfig = ActiveConfig.Score;
+            if (ActiveConfig.Score != null)
+                Debug.Log("[SceneBootstrap] 使用 GameConfig 中的 ScoreConfig");
+            else
+                Debug.LogWarning("[SceneBootstrap] GameConfig 中未配置 ScoreConfig,ScoreManager 将使用默认值。");
         }
 
         // ==================== 相机 ====================
@@ -159,13 +161,31 @@ namespace BlockPuzzle.Core
             float match = ActiveConfig?.Layout != null ? ActiveConfig.Layout.MatchWidthOrHeight : 0.5f;
             var theme = ActiveConfig?.Theme;
 
-            BackgroundCanvas = BuildCanvas("BackgroundCanvas", RenderMode.ScreenSpaceCamera, sortOrder: 0, refRes, match);
-            PlayCanvas = BuildCanvas("PlayCanvas", RenderMode.ScreenSpaceCamera, sortOrder: 10, refRes, match);
+            // BackgroundCanvas: 如果 Prefab 自带 Canvas 组件,直接实例化整个 Prefab 作为 BackgroundCanvas
+            if (_backgroundPrefab != null && _backgroundPrefab.GetComponent<Canvas>() != null)
+            {
+                var bgGo = Instantiate(_backgroundPrefab);
+                bgGo.name = "BackgroundCanvas";
+                var bgCanvas = bgGo.GetComponent<Canvas>();
+                // 确保 Camera 引用正确(Prefab 里可能没配)
+                if (bgCanvas.renderMode == RenderMode.ScreenSpaceCamera && bgCanvas.worldCamera == null)
+                    bgCanvas.worldCamera = Camera.main;
+                // 确保 sortingOrder 最低,渲染在所有 Canvas 最后面
+                bgCanvas.sortingOrder = Mathf.Min(bgCanvas.sortingOrder, -1);
+                // 移除 GraphicRaycaster 避免拦截点击事件
+                var raycaster = bgGo.GetComponent<GraphicRaycaster>();
+                if (raycaster != null) Destroy(raycaster);
+                BackgroundCanvas = bgCanvas;
+            }
+            else
+            {
+                BackgroundCanvas = BuildCanvas("BackgroundCanvas", RenderMode.ScreenSpaceCamera, sortOrder: 0, refRes, match);
+                CreateBackgroundImage(BackgroundCanvas);
+            }
+
+            PlayCanvas = BuildCanvas("PlayCanvas", RenderMode.ScreenSpaceOverlay, sortOrder: 10, refRes, match);
             HudCanvas = BuildCanvas("HudCanvas", RenderMode.ScreenSpaceOverlay, sortOrder: 20, refRes, match);
             OverlayCanvas = BuildCanvas("OverlayCanvas", RenderMode.ScreenSpaceOverlay, sortOrder: 30, refRes, match);
-
-            // 背景图
-            CreateBackgroundImage(BackgroundCanvas);
 
             // HUD / Overlay 各放一个 SafeAreaRoot,后续所有 HUD 内容都进 SafeAreaRoot
             HudSafeRoot = CreateSafeAreaRoot(HudCanvas, theme, isHud: true);
@@ -280,8 +300,25 @@ namespace BlockPuzzle.Core
             BoardRoot.anchorMin = new Vector2(0.5f, 0.5f);
             BoardRoot.anchorMax = new Vector2(0.5f, 0.5f);
             BoardRoot.pivot = new Vector2(0.5f, 0.5f);
-            BoardRoot.anchoredPosition = Vector2.zero;
             BoardRoot.localScale = Vector3.one;
+
+            // 应用棋盘位置偏移(LayoutConfig.BoardOffsetXRatio / BoardOffsetYRatio)
+            if (layoutConfig != null)
+            {
+                var canvasRt = (RectTransform)PlayCanvas.transform;
+                float screenW = canvasRt.rect.width;
+                float screenH = canvasRt.rect.height;
+                // Canvas 可能还没完成布局(rect 为 0),此时退回参考分辨率
+                if (screenW <= 0f) screenW = layoutConfig.ReferenceResolution.x;
+                if (screenH <= 0f) screenH = layoutConfig.ReferenceResolution.y;
+                float offX = layoutConfig.BoardOffsetXRatio * screenW;
+                float offY = layoutConfig.BoardOffsetYRatio * screenH;
+                BoardRoot.anchoredPosition = new Vector2(offX, offY);
+            }
+            else
+            {
+                BoardRoot.anchoredPosition = Vector2.zero;
+            }
 
             var fitter = boardGo.AddComponent<AspectRatioFitter>();
             fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
@@ -339,6 +376,7 @@ namespace BlockPuzzle.Core
             // 注入 BoardRoot
             InjectField(existing, "_boardRoot", BoardRoot);
             InjectField(existing, "_uiCellPrefab", _uiCellPrefab);
+            InjectField(existing, "_uiLogicCellPrefab", _uiLogicCellPrefab);
             InjectField(existing, "_uiPreviewPrefab", _uiPreviewPrefab);
             existing.Configure(ActiveConfig?.Layout, ActiveConfig?.Theme);
         }
@@ -379,7 +417,7 @@ namespace BlockPuzzle.Core
                 var go = new GameObject("[ScoreManager]");
                 sm = go.AddComponent<ScoreManager>();
             }
-            sm.SetConfig(_scoreConfig);
+            sm.SetConfig(ActiveConfig?.Score);
         }
 
         private void CreateGameManager()
@@ -495,9 +533,9 @@ namespace BlockPuzzle.Core
         {
             // 反射式按 SO 名查 FxLibrary / FloatingTextLibrary / AudioBindings
             // (M-R5 阶段 GameConfig.cs 里这三个字段是后加的,我们优先用 Resources 直接加载,避免重新做配置中心)
-            var fxLib = Resources.Load<FxLibrary>("Configs/FxLibrary");
-            var ftLib = Resources.Load<FloatingTextLibrary>("Configs/FloatingTextLibrary");
-            var bindings = Resources.Load<AudioBindings>("Configs/AudioBindings");
+            var fxLib = Resources.Load<FxLibrary>("Configs/02_Feel/FxLibrary");
+            var ftLib = Resources.Load<FloatingTextLibrary>("Configs/02_Feel/FloatingTextLibrary");
+            var bindings = Resources.Load<AudioBindings>("Configs/02_Feel/AudioBindings");
 
             // 1. 在 PlayCanvas 下加 FxLayer(覆盖在棋盘和候选区之上)
             FxLayer = CreateLayer(PlayCanvas.transform, "FxLayer", siblingLast: true);

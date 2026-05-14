@@ -19,7 +19,7 @@ namespace BlockPuzzle.Config
     [CreateAssetMenu(fileName = "FloatingTextLibrary", menuName = "BlockPuzzle/游戏配置/飘字模板库")]
     public sealed class FloatingTextLibrary : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/FloatingTextLibrary";
+        public const string ResourcesPath = "Configs/02_Feel/FloatingTextLibrary";
 
         public enum RenderMode
         {

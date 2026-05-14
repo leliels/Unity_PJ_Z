@@ -36,7 +36,7 @@ namespace BlockPuzzle.Editor
             serializedObject.Update();
 
             EditorGUILayout.HelpBox(
-                "这是计分规则配置资源。具体使用哪个配置，由 Boot 场景中 SceneBootstrap 的“本场景使用的计分配置”指定；如果未指定，则默认加载 Resources/Configs/ScoreConfig。",
+                "这是计分规则配置资源。具体使用哪个配置，由 Boot 场景中 SceneBootstrap 的“本场景使用的计分配置”指定；如果未指定，则默认加载 Resources/Configs/01_Gameplay/ScoreConfig。",
                 MessageType.Info);
 
             DrawHeader("消除计分");

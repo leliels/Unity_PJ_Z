@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 80448812685c8734ab89c178a16402f5
+guid: 28b19792d9cde1f499e0bc3bb2763216
 TextureImporter:
   internalIDToNameTable:
   - first:
@@ -116,10 +116,10 @@ TextureImporter:
       name: bg_game_0
       rect:
         serializedVersion: 2
-        x: 2
-        y: 0
-        width: 1078
-        height: 1920
+        x: 173
+        y: 1202
+        width: 122
+        height: 122
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}

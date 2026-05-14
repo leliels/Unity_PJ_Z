@@ -18,7 +18,7 @@ namespace BlockPuzzle.Config
     [CreateAssetMenu(fileName = "AudioBindings", menuName = "BlockPuzzle/游戏配置/事件音效绑定")]
     public sealed class AudioBindings : ScriptableObject
     {
-        public const string ResourcesPath = "Configs/AudioBindings";
+        public const string ResourcesPath = "Configs/02_Feel/AudioBindings";
 
         [Serializable]
         public class Binding

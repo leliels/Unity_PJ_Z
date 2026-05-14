@@ -29,7 +29,7 @@ namespace BlockPuzzle.Score
         [Header("计分配置")]
         [SerializeField]
         [InspectorName("计分配置")]
-        [Tooltip("计分规则配置。为空时会自动从 Resources/Configs/ScoreConfig 加载；仍为空则使用运行时默认值。")]
+        [Tooltip("计分规则配置。为空时会自动从 Resources/Configs/01_Gameplay/ScoreConfig 加载；仍为空则使用运行时默认值。")]
         private ScoreConfig _scoreConfig;
 
         private ScoreConfig _runtimeDefaultConfig;
@@ -237,7 +237,7 @@ namespace BlockPuzzle.Score
 
             if (!_configWarningLogged)
             {
-                Debug.LogWarning("[Score] 未找到 Resources/Configs/ScoreConfig，已使用运行时默认计分配置。");
+                Debug.LogWarning("[Score] 未找到 Resources/Configs/01_Gameplay/ScoreConfig，已使用运行时默认计分配置。");
                 _configWarningLogged = true;
             }
         }

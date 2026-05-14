@@ -174,12 +174,16 @@ namespace BlockPuzzle.Block
                 }
 
                 var rt = slot.GetComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(slotSize, slotSize);
+                // 有 Prefab 时尊重 Prefab 自身的 sizeDelta,不覆盖;无 Prefab 时才用计算值
+                if (_slotPrefab == null)
+                    rt.sizeDelta = new Vector2(slotSize, slotSize);
 
                 var le = slot.GetComponent<LayoutElement>();
                 if (le == null) le = slot.AddComponent<LayoutElement>();
-                le.preferredWidth = slotSize;
-                le.preferredHeight = slotSize;
+                // 有 Prefab 时用 Prefab 自身尺寸驱动 LayoutElement
+                float leSize = _slotPrefab != null ? rt.sizeDelta.x : slotSize;
+                le.preferredWidth = leSize;
+                le.preferredHeight = leSize;
 
                 _slotObjects[i] = slot;
             }
